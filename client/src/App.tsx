@@ -15,19 +15,44 @@ import AdminLogs from "./pages/AdminLogs";
 
 function Router() {
   return (
-    <DashboardLayout>
-      <Switch>
-        <Route path={"/"} component={Home} />
-        <Route path={"/products"} component={ProductManagement} />
-        <Route path={"/import"} component={ProductImport} />
-        <Route path={"/quotation"} component={QuotationFlow} />
-        <Route path={"/company"} component={CompanySettings} />
-        <Route path={"/users"} component={AdminUsers} />
-        <Route path={"/logs"} component={AdminLogs} />
-        <Route path={"/404"} component={NotFound} />
-        <Route component={NotFound} />
-      </Switch>
-    </DashboardLayout>
+    <Switch>
+      {/* 首页不使用侧边栏布局 */}
+      <Route path={"/"} component={Home} />
+      
+      {/* 其他页面使用DashboardLayout */}
+      <Route path={"/products"}>
+        <DashboardLayout>
+          <ProductManagement />
+        </DashboardLayout>
+      </Route>
+      <Route path={"/import"}>
+        <DashboardLayout>
+          <ProductImport />
+        </DashboardLayout>
+      </Route>
+      <Route path={"/quotation"}>
+        <DashboardLayout>
+          <QuotationFlow />
+        </DashboardLayout>
+      </Route>
+      <Route path={"/company"}>
+        <DashboardLayout>
+          <CompanySettings />
+        </DashboardLayout>
+      </Route>
+      <Route path={"/users"}>
+        <DashboardLayout>
+          <AdminUsers />
+        </DashboardLayout>
+      </Route>
+      <Route path={"/logs"}>
+        <DashboardLayout>
+          <AdminLogs />
+        </DashboardLayout>
+      </Route>
+      <Route path={"/404"} component={NotFound} />
+      <Route component={NotFound} />
+    </Switch>
   );
 }
 

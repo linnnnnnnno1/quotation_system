@@ -3,11 +3,11 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { getLoginUrl } from "@/const";
 import { trpc } from "@/lib/trpc";
-import { Package, FileText, Users, History, ArrowRight, LogIn } from "lucide-react";
+import { Package, FileText, Users, History, LogIn, Settings, Upload, ClipboardList, LogOut } from "lucide-react";
 import { Link } from "wouter";
 
 export default function Home() {
-  const { user, loading, isAuthenticated } = useAuth();
+  const { user, loading, isAuthenticated, logout } = useAuth();
   const isAdmin = user?.role === 'admin';
   
   const { data: products } = trpc.products.list.useQuery(undefined, {
@@ -73,91 +73,143 @@ export default function Home() {
     );
   }
   
+  // 已登录用户的首页 - 单页面集中显示
   return (
-    <div className="p-6 space-y-6">
-      <div className="flex items-center justify-between">
-        <div>
-          <h1 className="text-2xl font-bold">欢迎回来，{user?.name || '用户'}</h1>
-          <p className="text-muted-foreground">
-            {isAdmin ? '管理员' : '业务员'} · {user?.email}
-          </p>
+    <div className="min-h-screen bg-gray-50">
+      {/* 顶部导航栏 */}
+      <header className="bg-white border-b shadow-sm">
+        <div className="container mx-auto px-4 py-4 flex items-center justify-between">
+          <h1 className="text-xl font-bold text-gray-900">报价管理系统</h1>
+          <div className="flex items-center gap-4">
+            <span className="text-sm text-gray-600">
+              {user?.name || '用户'} ({isAdmin ? '管理员' : '业务员'})
+            </span>
+            <Button variant="outline" size="sm" onClick={() => logout()}>
+              <LogOut className="h-4 w-4 mr-1" />
+              退出
+            </Button>
+          </div>
         </div>
-      </div>
+      </header>
       
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
-        <Card>
-          <CardHeader className="flex flex-row items-center justify-between pb-2">
-            <CardTitle className="text-sm font-medium">产品总数</CardTitle>
-            <Package className="h-4 w-4 text-muted-foreground" />
-          </CardHeader>
-          <CardContent>
-            <div className="text-2xl font-bold">{products?.length || 0}</div>
-          </CardContent>
-        </Card>
+      <main className="container mx-auto px-4 py-8">
+        {/* 欢迎信息 */}
+        <div className="mb-8">
+          <h2 className="text-2xl font-bold text-gray-900">欢迎回来，{user?.name || '用户'}</h2>
+          <p className="text-gray-600 mt-1">{user?.email}</p>
+        </div>
         
-        <Card>
-          <CardHeader className="flex flex-row items-center justify-between pb-2">
-            <CardTitle className="text-sm font-medium">导出次数</CardTitle>
-            <FileText className="h-4 w-4 text-muted-foreground" />
-          </CardHeader>
-          <CardContent>
-            <div className="text-2xl font-bold">{exportHistory?.length || 0}</div>
-          </CardContent>
-        </Card>
+        {/* 统计卡片 */}
+        <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-8">
+          <Card>
+            <CardHeader className="flex flex-row items-center justify-between pb-2">
+              <CardTitle className="text-sm font-medium">产品总数</CardTitle>
+              <Package className="h-4 w-4 text-muted-foreground" />
+            </CardHeader>
+            <CardContent>
+              <div className="text-2xl font-bold">{products?.length || 0}</div>
+            </CardContent>
+          </Card>
+          
+          <Card>
+            <CardHeader className="flex flex-row items-center justify-between pb-2">
+              <CardTitle className="text-sm font-medium">导出次数</CardTitle>
+              <FileText className="h-4 w-4 text-muted-foreground" />
+            </CardHeader>
+            <CardContent>
+              <div className="text-2xl font-bold">{exportHistory?.length || 0}</div>
+            </CardContent>
+          </Card>
+          
+          <Card>
+            <CardHeader className="flex flex-row items-center justify-between pb-2">
+              <CardTitle className="text-sm font-medium">角色</CardTitle>
+              <Users className="h-4 w-4 text-muted-foreground" />
+            </CardHeader>
+            <CardContent>
+              <div className="text-2xl font-bold">{isAdmin ? '管理员' : '业务员'}</div>
+            </CardContent>
+          </Card>
+          
+          <Card>
+            <CardHeader className="flex flex-row items-center justify-between pb-2">
+              <CardTitle className="text-sm font-medium">最近登录</CardTitle>
+              <History className="h-4 w-4 text-muted-foreground" />
+            </CardHeader>
+            <CardContent>
+              <div className="text-sm font-medium">
+                {user?.lastSignedIn ? new Date(user.lastSignedIn).toLocaleDateString() : '-'}
+              </div>
+            </CardContent>
+          </Card>
+        </div>
         
-        <Card>
-          <CardHeader className="flex flex-row items-center justify-between pb-2">
-            <CardTitle className="text-sm font-medium">角色</CardTitle>
-            <Users className="h-4 w-4 text-muted-foreground" />
-          </CardHeader>
-          <CardContent>
-            <div className="text-2xl font-bold">{isAdmin ? '管理员' : '业务员'}</div>
-          </CardContent>
-        </Card>
-        
-        <Card>
-          <CardHeader className="flex flex-row items-center justify-between pb-2">
-            <CardTitle className="text-sm font-medium">最近登录</CardTitle>
-            <History className="h-4 w-4 text-muted-foreground" />
-          </CardHeader>
-          <CardContent>
-            <div className="text-sm font-medium">
-              {user?.lastSignedIn ? new Date(user.lastSignedIn).toLocaleDateString() : '-'}
-            </div>
-          </CardContent>
-        </Card>
-      </div>
-      
-      <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-        <Card>
-          <CardHeader>
-            <CardTitle>快速操作</CardTitle>
-            <CardDescription>常用功能入口</CardDescription>
-          </CardHeader>
-          <CardContent className="space-y-3">
-            <Link href="/quotation">
-              <Button variant="outline" className="w-full justify-between">
-                生成报价单
-                <ArrowRight className="h-4 w-4" />
-              </Button>
+        {/* 功能入口 */}
+        <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4 mb-8">
+          <Link href="/quotation">
+            <Card className="cursor-pointer hover:shadow-md transition-shadow h-full">
+              <CardContent className="flex flex-col items-center justify-center py-8">
+                <FileText className="h-12 w-12 text-green-500 mb-3" />
+                <span className="font-medium">生成报价单</span>
+              </CardContent>
+            </Card>
+          </Link>
+          
+          <Link href="/products">
+            <Card className="cursor-pointer hover:shadow-md transition-shadow h-full">
+              <CardContent className="flex flex-col items-center justify-center py-8">
+                <Package className="h-12 w-12 text-blue-500 mb-3" />
+                <span className="font-medium">产品管理</span>
+              </CardContent>
+            </Card>
+          </Link>
+          
+          {isAdmin && (
+            <Link href="/import">
+              <Card className="cursor-pointer hover:shadow-md transition-shadow h-full">
+                <CardContent className="flex flex-col items-center justify-center py-8">
+                  <Upload className="h-12 w-12 text-orange-500 mb-3" />
+                  <span className="font-medium">批量导入</span>
+                </CardContent>
+              </Card>
             </Link>
-            <Link href="/products">
-              <Button variant="outline" className="w-full justify-between">
-                产品管理
-                <ArrowRight className="h-4 w-4" />
-              </Button>
+          )}
+          
+          {isAdmin && (
+            <Link href="/company">
+              <Card className="cursor-pointer hover:shadow-md transition-shadow h-full">
+                <CardContent className="flex flex-col items-center justify-center py-8">
+                  <Settings className="h-12 w-12 text-gray-500 mb-3" />
+                  <span className="font-medium">公司设置</span>
+                </CardContent>
+              </Card>
             </Link>
-            {isAdmin && (
-              <Link href="/import">
-                <Button variant="outline" className="w-full justify-between">
-                  批量导入
-                  <ArrowRight className="h-4 w-4" />
-                </Button>
-              </Link>
-            )}
-          </CardContent>
-        </Card>
+          )}
+          
+          {isAdmin && (
+            <Link href="/users">
+              <Card className="cursor-pointer hover:shadow-md transition-shadow h-full">
+                <CardContent className="flex flex-col items-center justify-center py-8">
+                  <Users className="h-12 w-12 text-purple-500 mb-3" />
+                  <span className="font-medium">用户管理</span>
+                </CardContent>
+              </Card>
+            </Link>
+          )}
+          
+          {isAdmin && (
+            <Link href="/logs">
+              <Card className="cursor-pointer hover:shadow-md transition-shadow h-full">
+                <CardContent className="flex flex-col items-center justify-center py-8">
+                  <ClipboardList className="h-12 w-12 text-indigo-500 mb-3" />
+                  <span className="font-medium">操作日志</span>
+                </CardContent>
+              </Card>
+            </Link>
+          )}
+        </div>
         
+        {/* 权限说明 */}
         <Card>
           <CardHeader>
             <CardTitle>权限说明</CardTitle>
@@ -167,7 +219,7 @@ export default function Home() {
           </CardHeader>
           <CardContent>
             {isAdmin ? (
-              <ul className="space-y-2 text-sm">
+              <ul className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3 text-sm">
                 <li className="flex items-center gap-2">
                   <span className="w-2 h-2 bg-green-500 rounded-full"></span>
                   查看和管理所有产品信息
@@ -190,14 +242,14 @@ export default function Home() {
                 </li>
               </ul>
             ) : (
-              <ul className="space-y-2 text-sm">
+              <ul className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3 text-sm">
                 <li className="flex items-center gap-2">
                   <span className="w-2 h-2 bg-green-500 rounded-full"></span>
                   查看所有产品信息
                 </li>
                 <li className="flex items-center gap-2">
                   <span className="w-2 h-2 bg-green-500 rounded-full"></span>
-                  编辑产品非价格字段（编号、名称、描述、图片、尺寸、备注）
+                  编辑产品非价格字段
                 </li>
                 <li className="flex items-center gap-2">
                   <span className="w-2 h-2 bg-green-500 rounded-full"></span>
@@ -215,7 +267,7 @@ export default function Home() {
             )}
           </CardContent>
         </Card>
-      </div>
+      </main>
     </div>
   );
 }

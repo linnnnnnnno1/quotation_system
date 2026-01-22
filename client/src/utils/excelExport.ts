@@ -395,8 +395,15 @@ export async function exportQuotationToExcel(options: ExportOptions): Promise<Bl
           extension: imageData.extension,
         });
         
+        // 计算图片居中偏移量
+        // D列宽度23.33 ≈ 175像素，图片宽度146像素，水平偏移 (175-146)/2 ≈ 14.5像素
+        // 行高160 ≈ 120像素，图片高度102像素，垂直偏移 (120-102)/2 ≈ 9像素
+        // ExcelJS的col/row偏移使用小数表示像素偏移比例
+        const colOffset = 0.08; // 水平居中偏移
+        const rowOffset = 0.18; // 垂直居中偏移
+        
         worksheet.addImage(imageId, {
-          tl: { col: 3, row: rowNum - 1 },
+          tl: { col: 3 + colOffset, row: rowNum - 1 + rowOffset },
           ext: { width: 146, height: 102 },
           editAs: 'oneCell'
         } as any);
