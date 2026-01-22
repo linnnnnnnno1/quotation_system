@@ -373,7 +373,8 @@ export async function exportQuotationToExcel(options: ExportOptions): Promise<Bl
     }
   }
   
-  // 添加图片到D列
+  // 添加图片到D列（D列是第4列，索引为3）
+  // 行高160对应约120像素，列宽23.33对应约175像素
   for (let i = 0; i < items.length; i++) {
     const imageData = imageDataMap.get(i);
     if (imageData) {
@@ -384,10 +385,14 @@ export async function exportQuotationToExcel(options: ExportOptions): Promise<Bl
           extension: imageData.extension,
         });
         
+        // 使用tl和ext方式定位图片，指定固定的像素尺寸
+        // 列宽23.33 ≈ 175像素，行高160 ≈ 120像素
+        // 留一点边距，图片尺寸设为 165x115
         worksheet.addImage(imageId, {
-          tl: { col: 3.05, row: rowNum - 0.95 } as any,
-          br: { col: 3.95, row: rowNum - 0.05 } as any,
-        });
+          tl: { col: 3, row: rowNum - 1 },
+          ext: { width: 165, height: 115 },
+          editAs: 'oneCell'
+        } as any);
         console.log(`图片 ${i + 1} 已添加到Excel`);
       } catch (error) {
         console.error(`添加图片 ${i + 1} 到Excel失败:`, error);
