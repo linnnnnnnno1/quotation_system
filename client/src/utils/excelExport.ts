@@ -390,7 +390,7 @@ export async function exportQuotationToExcel(options: ExportOptions): Promise<Bl
         // 留一点边距，图片尺寸设为 165x115
         worksheet.addImage(imageId, {
           tl: { col: 3, row: rowNum - 1 },
-          ext: { width: 165, height: 115 },
+          ext: { width: 146, height: 102 },
           editAs: 'oneCell'
         } as any);
         console.log(`图片 ${i + 1} 已添加到Excel`);
