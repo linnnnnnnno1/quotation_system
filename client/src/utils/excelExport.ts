@@ -385,29 +385,36 @@ export async function exportQuotationToExcel(options: ExportOptions): Promise<Bl
   }
   
   // 添加图片到D列（D列是第4列，索引为3）
+  // ExcelJS使用0索引，所以行号需要减1
+  // dataStartRow是第9行（Excel中），在ExcelJS中是索引8
   for (let i = 0; i < items.length; i++) {
     const imageData = imageDataMap.get(i);
     if (imageData) {
-      const rowNum = dataStartRow + i;
+      // Excel行号从1开始，ExcelJS的tl使用0索引
+      // dataStartRow是Excel行号（例如第9行），转换为0索引需要减1
+      const excelRowIndex = dataStartRow + i - 1; // 转换为0索引
+      
       try {
         const imageId = workbook.addImage({
           base64: imageData.base64,
           extension: imageData.extension,
         });
         
-        // 计算图片居中偏移量
-        // D列宽度23.33 ≈ 175像素，图片宽度146像素，水平偏移 (175-146)/2 ≈ 14.5像素
-        // 行高160 ≈ 120像素，图片高度102像素，垂直偏移 (120-102)/2 ≈ 9像素
-        // ExcelJS的col/row偏移使用小数表示像素偏移比例
+        // 图片尺寸：宽146像素，高102像素
+        // D列宽度23.33 Excel单位 ≈ 175像素
+        // 行高160 Excel单位 ≈ 120像素
+        // 水平居中偏移: (175-146)/2/175 ≈ 0.08
+        // 垂直居中偏移: (120-102)/2/120 ≈ 0.075
         const colOffset = 0.08; // 水平居中偏移
-        const rowOffset = 0.18; // 垂直居中偏移
+        const rowOffset = 0.08; // 垂直居中偏移
         
+        // 使用tl+br定位方式，确保图片严格在单元格内
         worksheet.addImage(imageId, {
-          tl: { col: 3 + colOffset, row: rowNum - 1 + rowOffset },
-          ext: { width: 146, height: 102 },
+          tl: { col: 3 + colOffset, row: excelRowIndex + rowOffset },
+          br: { col: 3.92, row: excelRowIndex + 0.92 }, // 结束位置略小于单元格边界
           editAs: 'oneCell'
         } as any);
-        console.log(`图片 ${i + 1} 已添加到Excel`);
+        console.log(`图片 ${i + 1} 已添加到Excel，行索引: ${excelRowIndex}`);
       } catch (error) {
         console.error(`添加图片 ${i + 1} 到Excel失败:`, error);
       }
