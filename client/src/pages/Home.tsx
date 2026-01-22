@@ -14,10 +14,6 @@ export default function Home() {
     enabled: isAuthenticated,
   });
   
-  const { data: exportHistory } = trpc.exports.getUserExports.useQuery(undefined, {
-    enabled: isAuthenticated,
-  });
-  
   if (loading) {
     return (
       <div className="min-h-screen flex items-center justify-center">
@@ -95,56 +91,11 @@ export default function Home() {
       <main className="container mx-auto px-4 py-8">
         {/* 欢迎信息 */}
         <div className="mb-8">
-          <h2 className="text-2xl font-bold text-gray-900">欢迎回来，{user?.name || '用户'}</h2>
+          <h2 className="text-2xl font-bold text-gray-900">滴滴，{user?.name || '用户'}</h2>
           <p className="text-gray-600 mt-1">{user?.email}</p>
         </div>
         
-        {/* 统计卡片 */}
-        <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-8">
-          <Card>
-            <CardHeader className="flex flex-row items-center justify-between pb-2">
-              <CardTitle className="text-sm font-medium">产品总数</CardTitle>
-              <Package className="h-4 w-4 text-muted-foreground" />
-            </CardHeader>
-            <CardContent>
-              <div className="text-2xl font-bold">{products?.length || 0}</div>
-            </CardContent>
-          </Card>
-          
-          <Card>
-            <CardHeader className="flex flex-row items-center justify-between pb-2">
-              <CardTitle className="text-sm font-medium">导出次数</CardTitle>
-              <FileText className="h-4 w-4 text-muted-foreground" />
-            </CardHeader>
-            <CardContent>
-              <div className="text-2xl font-bold">{exportHistory?.length || 0}</div>
-            </CardContent>
-          </Card>
-          
-          <Card>
-            <CardHeader className="flex flex-row items-center justify-between pb-2">
-              <CardTitle className="text-sm font-medium">角色</CardTitle>
-              <Users className="h-4 w-4 text-muted-foreground" />
-            </CardHeader>
-            <CardContent>
-              <div className="text-2xl font-bold">{isAdmin ? '管理员' : '业务员'}</div>
-            </CardContent>
-          </Card>
-          
-          <Card>
-            <CardHeader className="flex flex-row items-center justify-between pb-2">
-              <CardTitle className="text-sm font-medium">最近登录</CardTitle>
-              <History className="h-4 w-4 text-muted-foreground" />
-            </CardHeader>
-            <CardContent>
-              <div className="text-sm font-medium">
-                {user?.lastSignedIn ? new Date(user.lastSignedIn).toLocaleDateString() : '-'}
-              </div>
-            </CardContent>
-          </Card>
-        </div>
-        
-        {/* 功能入口 */}
+        {/* 功能入口 - 放在最上面 */}
         <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4 mb-8">
           <Link href="/quotation">
             <Card className="cursor-pointer hover:shadow-md transition-shadow h-full">
@@ -207,6 +158,15 @@ export default function Home() {
               </Card>
             </Link>
           )}
+          
+          {/* 产品总数放在操作日志后面 */}
+          <Card className="h-full">
+            <CardContent className="flex flex-col items-center justify-center py-8">
+              <Package className="h-12 w-12 text-cyan-500 mb-3" />
+              <span className="font-medium">产品总数</span>
+              <span className="text-2xl font-bold mt-2">{products?.length || 0}</span>
+            </CardContent>
+          </Card>
         </div>
         
         {/* 权限说明 */}
