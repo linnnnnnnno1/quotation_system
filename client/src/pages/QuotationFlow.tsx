@@ -11,7 +11,7 @@ import { trpc } from "@/lib/trpc";
 import { CUSTOMER_LEVELS, CURRENCIES, DEFAULT_EXCHANGE_RATE, CustomerLevel, CurrencyType } from "@/const";
 import { exportQuotationToExcel, QuotationItem } from "@/utils/excelExport";
 import { ArrowLeft, ArrowRight, Download, Plus, Trash2, Search, Image as ImageIcon } from "lucide-react";
-import { useState, useMemo } from "react";
+import { useState, useMemo, useEffect } from "react";
 import { toast } from "sonner";
 
 interface QuotationItemLocal {
@@ -21,7 +21,14 @@ interface QuotationItemLocal {
   productName: string;
   imageUrl?: string | null;
   quantity: number;
+  customerLevel: CustomerLevel; // 每个产品单独的客户级别
   unitPrice: number;
+  // 存储所有价格，方便切换客户级别时更新
+  retailPrice: number;
+  smallBPrice: number;
+  largeBPrice: number;
+  bulkPrice: number;
+  cheapPrice: number;
   length?: string | null;
   width?: string | null;
   height?: string | null;
@@ -37,25 +44,30 @@ export default function QuotationFlow() {
   
   // Step 1: 批量输入
   const [batchInput, setBatchInput] = useState('');
-  const [customerLevel, setCustomerLevel] = useState<CustomerLevel>('retail');
   
   // Step 2: 预览编辑
   const [items, setItems] = useState<QuotationItemLocal[]>([]);
   const [currency, setCurrency] = useState<CurrencyType>('CNY');
   const [exchangeRate, setExchangeRate] = useState(DEFAULT_EXCHANGE_RATE);
   const [includeDimensions, setIncludeDimensions] = useState(false);
+  const [defaultCustomerLevel, setDefaultCustomerLevel] = useState<CustomerLevel>('retail');
   
   // 搜索产品
   const [searchKeyword, setSearchKeyword] = useState('');
-  const { data: searchResults } = trpc.products.search.useQuery(searchKeyword, {
-    enabled: searchKeyword.length > 0,
-  });
-  const { data: allProducts } = trpc.products.list.useQuery();
+  const { data: allProducts, isLoading: isLoadingProducts } = trpc.products.list.useQuery();
   const { data: companyInfo } = trpc.company.getInfo.useQuery();
   
-  const imageProxyQuery = trpc.imageProxy.useQuery;
-  
   const recordExportMutation = trpc.exports.record.useMutation();
+  
+  // 本地搜索产品（基于已加载的产品列表）
+  const searchResults = useMemo(() => {
+    if (!searchKeyword.trim() || !allProducts) return [];
+    const keyword = searchKeyword.toLowerCase().trim();
+    return allProducts.filter(p => 
+      p.productCode.toLowerCase().includes(keyword) ||
+      p.productName.toLowerCase().includes(keyword)
+    ).slice(0, 10); // 最多显示10个结果
+  }, [searchKeyword, allProducts]);
   
   // 根据客户级别获取价格
   const getPriceByLevel = (product: any, level: CustomerLevel): number => {
@@ -71,19 +83,27 @@ export default function QuotationFlow() {
   
   // 解析批量输入
   const parseBatchInput = () => {
+    if (!allProducts || allProducts.length === 0) {
+      toast.error('产品数据尚未加载，请稍后重试');
+      return;
+    }
+    
     const lines = batchInput.trim().split('\n').filter(line => line.trim());
     const newItems: QuotationItemLocal[] = [];
     const notFound: string[] = [];
     
     for (const line of lines) {
       const parts = line.split(/[\t,，\s]+/).filter(p => p.trim());
-      if (parts.length < 2) continue;
+      if (parts.length < 1) continue;
       
       const code = parts[0].trim();
-      const qty = parseInt(parts[1]) || 1;
+      const qty = parts.length >= 2 ? (parseInt(parts[1]) || 1) : 1;
       
-      const product = allProducts?.find(p => 
-        p.productCode.toLowerCase() === code.toLowerCase()
+      // 使用更宽松的匹配：包含匹配
+      const product = allProducts.find(p => 
+        p.productCode.toLowerCase() === code.toLowerCase() ||
+        p.productCode.toLowerCase().includes(code.toLowerCase()) ||
+        code.toLowerCase().includes(p.productCode.toLowerCase())
       );
       
       if (product) {
@@ -94,7 +114,13 @@ export default function QuotationFlow() {
           productName: product.productName,
           imageUrl: product.imageUrl,
           quantity: qty,
-          unitPrice: getPriceByLevel(product, customerLevel),
+          customerLevel: defaultCustomerLevel,
+          unitPrice: getPriceByLevel(product, defaultCustomerLevel),
+          retailPrice: product.retailPrice,
+          smallBPrice: product.smallBPrice,
+          largeBPrice: product.largeBPrice,
+          bulkPrice: product.bulkPrice,
+          cheapPrice: product.cheapPrice,
           length: product.length,
           width: product.width,
           height: product.height,
@@ -117,8 +143,8 @@ export default function QuotationFlow() {
       setBatchInput('');
       setStep(2);
       toast.success(`已添加 ${newItems.length} 个产品`);
-    } else {
-      toast.error('未找到任何有效产品');
+    } else if (lines.length > 0) {
+      toast.error('未找到任何有效产品，请检查产品编号是否正确');
     }
   };
   
@@ -131,7 +157,13 @@ export default function QuotationFlow() {
       productName: product.productName,
       imageUrl: product.imageUrl,
       quantity: 1,
-      unitPrice: getPriceByLevel(product, customerLevel),
+      customerLevel: defaultCustomerLevel,
+      unitPrice: getPriceByLevel(product, defaultCustomerLevel),
+      retailPrice: product.retailPrice,
+      smallBPrice: product.smallBPrice,
+      largeBPrice: product.largeBPrice,
+      bulkPrice: product.bulkPrice,
+      cheapPrice: product.cheapPrice,
       length: product.length,
       width: product.width,
       height: product.height,
@@ -150,6 +182,28 @@ export default function QuotationFlow() {
     setItems(prev => prev.map(item => 
       item.id === id ? { ...item, quantity: Math.max(1, quantity) } : item
     ));
+  };
+  
+  // 更新单个产品的客户级别
+  const updateItemCustomerLevel = (id: string, level: CustomerLevel) => {
+    setItems(prev => prev.map(item => {
+      if (item.id !== id) return item;
+      return {
+        ...item,
+        customerLevel: level,
+        unitPrice: getPriceByLevel(item, level),
+      };
+    }));
+  };
+  
+  // 批量更新所有产品的客户级别
+  const updateAllCustomerLevels = (level: CustomerLevel) => {
+    setDefaultCustomerLevel(level);
+    setItems(prev => prev.map(item => ({
+      ...item,
+      customerLevel: level,
+      unitPrice: getPriceByLevel(item, level),
+    })));
   };
   
   // 删除项目
@@ -279,39 +333,36 @@ export default function QuotationFlow() {
           <CardHeader>
             <CardTitle>批量输入产品</CardTitle>
             <CardDescription>
-              每行输入一个产品，格式：产品编号 数量（用空格、Tab或逗号分隔）
+              每行输入一个产品，格式：产品编号 数量（用空格、Tab或逗号分隔），数量可省略默认为1
             </CardDescription>
           </CardHeader>
           <CardContent className="space-y-4">
-            <div className="grid grid-cols-2 gap-4">
-              <div className="space-y-2">
-                <Label>客户级别</Label>
-                <Select value={customerLevel} onValueChange={(v) => setCustomerLevel(v as CustomerLevel)}>
-                  <SelectTrigger>
-                    <SelectValue />
-                  </SelectTrigger>
-                  <SelectContent>
-                    {Object.entries(CUSTOMER_LEVELS).map(([key, label]) => (
-                      <SelectItem key={key} value={key}>{label}</SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
+            {isLoadingProducts && (
+              <div className="text-sm text-muted-foreground">正在加载产品数据...</div>
+            )}
+            
+            {allProducts && (
+              <div className="text-sm text-muted-foreground">
+                已加载 {allProducts.length} 个产品
               </div>
-            </div>
+            )}
             
             <div className="space-y-2">
               <Label>产品列表</Label>
               <Textarea
                 value={batchInput}
                 onChange={(e) => setBatchInput(e.target.value)}
-                placeholder={`示例：\nPROD001 10\nPROD002 5\nPROD003,20`}
+                placeholder={`示例：\nPROD001 10\nPROD002 5\nPROD003`}
                 rows={10}
                 className="font-mono"
               />
             </div>
             
-            <div className="flex justify-end">
-              <Button onClick={parseBatchInput} disabled={!batchInput.trim()}>
+            <div className="flex justify-between items-center">
+              <div className="text-sm text-muted-foreground">
+                提示：在下一步可以为每个产品单独选择客户级别
+              </div>
+              <Button onClick={parseBatchInput} disabled={!batchInput.trim() || isLoadingProducts}>
                 下一步
                 <ArrowRight className="h-4 w-4 ml-2" />
               </Button>
@@ -326,7 +377,7 @@ export default function QuotationFlow() {
           <CardHeader>
             <CardTitle>预览和编辑</CardTitle>
             <CardDescription>
-              检查产品列表，调整数量，设置货币和导出选项
+              检查产品列表，调整数量和客户级别，设置货币和导出选项
             </CardDescription>
           </CardHeader>
           <CardContent className="space-y-4">
@@ -366,6 +417,20 @@ export default function QuotationFlow() {
                 />
                 <Label>导出尺寸信息</Label>
               </div>
+              
+              <div className="flex items-center gap-2 ml-auto">
+                <Label>批量设置级别</Label>
+                <Select value={defaultCustomerLevel} onValueChange={(v) => updateAllCustomerLevels(v as CustomerLevel)}>
+                  <SelectTrigger className="w-32">
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {Object.entries(CUSTOMER_LEVELS).map(([key, label]) => (
+                      <SelectItem key={key} value={key}>{label}</SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
             </div>
             
             {/* 搜索添加产品 */}
@@ -377,7 +442,7 @@ export default function QuotationFlow() {
                 onChange={(e) => setSearchKeyword(e.target.value)}
                 className="pl-9"
               />
-              {searchResults && searchResults.length > 0 && searchKeyword && (
+              {searchResults.length > 0 && searchKeyword && (
                 <div className="absolute top-full left-0 right-0 mt-1 bg-background border rounded-lg shadow-lg z-10 max-h-60 overflow-auto">
                   {searchResults.map((product) => (
                     <div
@@ -394,72 +459,95 @@ export default function QuotationFlow() {
                   ))}
                 </div>
               )}
+              {searchKeyword && searchResults.length === 0 && (
+                <div className="absolute top-full left-0 right-0 mt-1 bg-background border rounded-lg shadow-lg z-10 p-3 text-muted-foreground">
+                  未找到匹配的产品
+                </div>
+              )}
             </div>
             
             {/* 产品列表 */}
-            <Table>
-              <TableHeader>
-                <TableRow>
-                  <TableHead className="w-16">图片</TableHead>
-                  <TableHead>产品编号</TableHead>
-                  <TableHead>产品名称</TableHead>
-                  {includeDimensions && <TableHead>尺寸</TableHead>}
-                  {includeDimensions && <TableHead>装箱数</TableHead>}
-                  <TableHead className="text-center">数量</TableHead>
-                  <TableHead className="text-right">单价</TableHead>
-                  <TableHead className="text-right">金额</TableHead>
-                  <TableHead className="w-16"></TableHead>
-                </TableRow>
-              </TableHeader>
-              <TableBody>
-                {items.map((item) => (
-                  <TableRow key={item.id}>
-                    <TableCell>
-                      {item.imageUrl ? (
-                        <img 
-                          src={item.imageUrl} 
-                          alt={item.productName}
-                          className="w-10 h-10 object-cover rounded"
-                        />
-                      ) : (
-                        <div className="w-10 h-10 bg-muted rounded flex items-center justify-center">
-                          <ImageIcon className="h-5 w-5 text-muted-foreground" />
-                        </div>
-                      )}
-                    </TableCell>
-                    <TableCell className="font-medium">{item.productCode}</TableCell>
-                    <TableCell>{item.productName}</TableCell>
-                    {includeDimensions && <TableCell>{getDimensionDisplay(item)}</TableCell>}
-                    {includeDimensions && <TableCell>{item.pcsPerCarton || '-'}</TableCell>}
-                    <TableCell className="text-center">
-                      <Input
-                        type="number"
-                        value={item.quantity}
-                        onChange={(e) => updateQuantity(item.id, parseInt(e.target.value) || 1)}
-                        className="w-20 text-center"
-                        min={1}
-                      />
-                    </TableCell>
-                    <TableCell className="text-right">{formatPrice(item.unitPrice)}</TableCell>
-                    <TableCell className="text-right font-medium">
-                      {formatPrice(item.unitPrice * item.quantity)}
-                    </TableCell>
-                    <TableCell>
-                      <Button variant="ghost" size="icon" onClick={() => removeItem(item.id)}>
-                        <Trash2 className="h-4 w-4 text-destructive" />
-                      </Button>
-                    </TableCell>
-                  </TableRow>
-                ))}
-                {items.length === 0 && (
+            <div className="border rounded-lg overflow-hidden">
+              <Table>
+                <TableHeader>
                   <TableRow>
-                    <TableCell colSpan={includeDimensions ? 10 : 8} className="text-center py-8 text-muted-foreground">
-                      暂无产品，请添加
-                    </TableCell>
+                    <TableHead className="w-16">图片</TableHead>
+                    <TableHead>产品编号</TableHead>
+                    <TableHead>产品名称</TableHead>
+                    <TableHead className="w-32">客户级别</TableHead>
+                    {includeDimensions && <TableHead>尺寸</TableHead>}
+                    {includeDimensions && <TableHead>装箱数</TableHead>}
+                    <TableHead className="text-center w-24">数量</TableHead>
+                    <TableHead className="text-right">单价</TableHead>
+                    <TableHead className="text-right">金额</TableHead>
+                    <TableHead className="w-16"></TableHead>
                   </TableRow>
-                )}
-              </TableBody>
-            </Table>
+                </TableHeader>
+                <TableBody>
+                  {items.map((item) => (
+                    <TableRow key={item.id}>
+                      <TableCell>
+                        {item.imageUrl ? (
+                          <img 
+                            src={item.imageUrl} 
+                            alt={item.productName}
+                            className="w-10 h-10 object-cover rounded"
+                          />
+                        ) : (
+                          <div className="w-10 h-10 bg-muted rounded flex items-center justify-center">
+                            <ImageIcon className="h-5 w-5 text-muted-foreground" />
+                          </div>
+                        )}
+                      </TableCell>
+                      <TableCell className="font-medium">{item.productCode}</TableCell>
+                      <TableCell>{item.productName}</TableCell>
+                      <TableCell>
+                        <Select 
+                          value={item.customerLevel} 
+                          onValueChange={(v) => updateItemCustomerLevel(item.id, v as CustomerLevel)}
+                        >
+                          <SelectTrigger className="h-8">
+                            <SelectValue />
+                          </SelectTrigger>
+                          <SelectContent>
+                            {Object.entries(CUSTOMER_LEVELS).map(([key, label]) => (
+                              <SelectItem key={key} value={key}>{label}</SelectItem>
+                            ))}
+                          </SelectContent>
+                        </Select>
+                      </TableCell>
+                      {includeDimensions && <TableCell>{getDimensionDisplay(item)}</TableCell>}
+                      {includeDimensions && <TableCell>{item.pcsPerCarton || '-'}</TableCell>}
+                      <TableCell className="text-center">
+                        <Input
+                          type="number"
+                          value={item.quantity}
+                          onChange={(e) => updateQuantity(item.id, parseInt(e.target.value) || 1)}
+                          className="w-20 text-center h-8"
+                          min={1}
+                        />
+                      </TableCell>
+                      <TableCell className="text-right">{formatPrice(item.unitPrice)}</TableCell>
+                      <TableCell className="text-right font-medium">
+                        {formatPrice(item.unitPrice * item.quantity)}
+                      </TableCell>
+                      <TableCell>
+                        <Button variant="ghost" size="icon" onClick={() => removeItem(item.id)}>
+                          <Trash2 className="h-4 w-4 text-destructive" />
+                        </Button>
+                      </TableCell>
+                    </TableRow>
+                  ))}
+                  {items.length === 0 && (
+                    <TableRow>
+                      <TableCell colSpan={includeDimensions ? 11 : 9} className="text-center py-8 text-muted-foreground">
+                        暂无产品，请在上方搜索添加或返回上一步批量输入
+                      </TableCell>
+                    </TableRow>
+                  )}
+                </TableBody>
+              </Table>
+            </div>
             
             {/* 总计 */}
             {items.length > 0 && (
@@ -505,12 +593,12 @@ export default function QuotationFlow() {
                 <p className="text-2xl font-bold">{formatPrice(totalAmount)}</p>
               </div>
               <div className="space-y-2">
-                <Label className="text-muted-foreground">客户级别</Label>
-                <p className="text-lg">{CUSTOMER_LEVELS[customerLevel]}</p>
-              </div>
-              <div className="space-y-2">
                 <Label className="text-muted-foreground">货币</Label>
                 <p className="text-lg">{CURRENCIES[currency].name}</p>
+              </div>
+              <div className="space-y-2">
+                <Label className="text-muted-foreground">包含尺寸信息</Label>
+                <p className="text-lg">{includeDimensions ? '是' : '否'}</p>
               </div>
             </div>
             
