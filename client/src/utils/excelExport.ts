@@ -400,18 +400,18 @@ export async function exportQuotationToExcel(options: ExportOptions): Promise<Bl
           extension: imageData.extension,
         });
         
-        // 图片尺寸：宽146像素，高102像素
-        // D列宽度23.33 Excel单位 ≈ 175像素
-        // 行高160 Excel单位 ≈ 120像素
-        // 水平居中偏移: (175-146)/2/175 ≈ 0.08
-        // 垂直居中偏移: (120-102)/2/120 ≈ 0.075
-        const colOffset = 0.08; // 水平居中偏移
-        const rowOffset = 0.08; // 垂直居中偏移
+        // 图片尺寸：宽146像素，高102像素（保持不变）
+        // D列宽度23.33 Excel单位，换算为像素约 23.33 * 7.5 ≈ 175像素
+        // 行高160 Excel单位，换算为像素约 160 * 0.75 ≈ 120像素
+        // 水平居中偏移: (175-146)/2 = 14.5像素，转换为列单位: 14.5/175 ≈ 0.083
+        // 垂直居中偏移: (120-102)/2 = 9像素，转换为行单位: 9/120 ≈ 0.075
+        const colOffset = 0.083; // 水平居中偏移
+        const rowOffset = 0.075; // 垂直居中偏移
         
-        // 使用tl+br定位方式，确保图片严格在单元格内
+        // 使用tl+ext定位方式，保持图片原始尺寸不变
         worksheet.addImage(imageId, {
           tl: { col: 3 + colOffset, row: excelRowIndex + rowOffset },
-          br: { col: 3.92, row: excelRowIndex + 0.92 }, // 结束位置略小于单元格边界
+          ext: { width: 146, height: 102 }, // 固定图片尺寸，不压缩
           editAs: 'oneCell'
         } as any);
         console.log(`图片 ${i + 1} 已添加到Excel，行索引: ${excelRowIndex}`);
