@@ -34,6 +34,9 @@ export interface ExportOptions {
   imageProxyFn?: (url: string) => Promise<string | null>;
 }
 
+// 默认字体设置
+const DEFAULT_FONT: Partial<ExcelJS.Font> = { name: 'Calibri', size: 10 };
+
 // 将图片URL转换为base64
 async function imageUrlToBase64(
   url: string, 
@@ -127,38 +130,38 @@ export async function exportQuotationToExcel(options: ExportOptions): Promise<Bl
   const totalColCount = baseColCount + dimColCount;
   const lastColLetter = includeDimensions ? 'O' : 'G';
   
-  // 设置列宽
-  worksheet.getColumn(1).width = 5;    // A - NO.
-  worksheet.getColumn(2).width = 16;   // B - Item No.
-  worksheet.getColumn(3).width = 25;   // C - Description
-  worksheet.getColumn(4).width = 12;   // D - PICTURES
-  worksheet.getColumn(5).width = 10;   // E - QTY/SET
-  worksheet.getColumn(6).width = 12;   // F - PRICE
-  worksheet.getColumn(7).width = 14;   // G - AMOUNT
+  // ========== 设置列宽（按用户要求） ==========
+  worksheet.getColumn(1).width = 9.53;    // A - NO.
+  worksheet.getColumn(2).width = 16.13;   // B - Item No.
+  worksheet.getColumn(3).width = 24.8;    // C - Description
+  worksheet.getColumn(4).width = 23.33;   // D - PICTURES
+  worksheet.getColumn(5).width = 15.87;   // E - QTY/SET
+  worksheet.getColumn(6).width = 16.33;   // F - PRICE
+  worksheet.getColumn(7).width = 20.33;   // G - AMOUNT
   
   if (includeDimensions) {
-    worksheet.getColumn(8).width = 8;   // H - L/cm
-    worksheet.getColumn(9).width = 8;   // I - W/cm
-    worksheet.getColumn(10).width = 8;  // J - H/cm
-    worksheet.getColumn(11).width = 10; // K - CBM/Per (m³)
-    worksheet.getColumn(12).width = 8;  // L - CTN
-    worksheet.getColumn(13).width = 10; // M - CBM/m³
-    worksheet.getColumn(14).width = 10; // N - NW/kg
-    worksheet.getColumn(15).width = 15; // O - Note
+    worksheet.getColumn(8).width = 7.27;   // H - L/cm
+    worksheet.getColumn(9).width = 7.27;   // I - W/cm
+    worksheet.getColumn(10).width = 7.27;  // J - H/cm
+    worksheet.getColumn(11).width = 7.27;  // K - CBM/Per (m³)
+    worksheet.getColumn(12).width = 7.27;  // L - CTN
+    worksheet.getColumn(13).width = 7.27;  // M - CBM/m³
+    worksheet.getColumn(14).width = 7.27;  // N - NW/kg
+    worksheet.getColumn(15).width = 16.6;  // O - Note
   }
   
   let currentRow = 1;
   
-  // ========== 第1行：公司名称 ==========
+  // ========== 第1行：公司名称（字体14，行高52） ==========
   worksheet.mergeCells(`A${currentRow}:${lastColLetter}${currentRow}`);
   const companyCell = worksheet.getCell(`A${currentRow}`);
   companyCell.value = companyInfo?.companyName || 'GUANGZHOU EXPLORER AUTO PARTS CO.,LTD.';
-  companyCell.font = { bold: true, color: { argb: '0000FF' } };
+  companyCell.font = { name: 'Calibri', size: 14, bold: true, color: { argb: '0000FF' } };
   companyCell.alignment = { horizontal: 'center', vertical: 'middle' };
-  worksheet.getRow(currentRow).height = 22;
+  worksheet.getRow(currentRow).height = 52;
   currentRow++;
   
-  // ========== 第2行：公司地址（小6号字） ==========
+  // ========== 第2行：公司地址（字体8，行高52） ==========
   worksheet.mergeCells(`A${currentRow}:${lastColLetter}${currentRow}`);
   const addressCell = worksheet.getCell(`A${currentRow}`);
   const companyAddress = companyInfo?.address || 'ADD: No. 25 Daling Road, Daling, Baiyun District, Guangzhou City, Guangdong Province';
@@ -166,79 +169,87 @@ export async function exportQuotationToExcel(options: ExportOptions): Promise<Bl
     ? `\n${companyInfo.phone}      Email: ${companyInfo.email}`
     : '\nChuang Lin 0086 18826074914      Email: linchuanglc@163.com';
   addressCell.value = companyAddress + contactInfo;
-  addressCell.font = { size: 8 };
+  addressCell.font = { name: 'Calibri', size: 8 };
   addressCell.alignment = { horizontal: 'center', vertical: 'middle', wrapText: true };
-  worksheet.getRow(currentRow).height = 30;
+  worksheet.getRow(currentRow).height = 52;
   currentRow++;
   
-  // ========== 第3行：PROFORMA INVOICE ==========
+  // ========== 第3行：PROFORMA INVOICE（字体10，行高52） ==========
   worksheet.mergeCells(`A${currentRow}:${lastColLetter}${currentRow}`);
   const titleCell = worksheet.getCell(`A${currentRow}`);
   titleCell.value = 'PROFORMA INVOICE';
-  titleCell.font = { bold: true, underline: true };
+  titleCell.font = { name: 'Calibri', size: 10, bold: true, underline: true };
   titleCell.alignment = { horizontal: 'center', vertical: 'middle' };
-  worksheet.getRow(currentRow).height = 22;
+  worksheet.getRow(currentRow).height = 52;
   currentRow++;
   
-  // ========== 第4行：DATE 和 ORDER NO ==========
+  // ========== 第4行：DATE 和 ORDER NO（字体10，行高36） ==========
   worksheet.getCell(`A${currentRow}`).value = 'DATE:';
+  worksheet.getCell(`A${currentRow}`).font = { ...DEFAULT_FONT };
   worksheet.getCell(`A${currentRow}`).alignment = { horizontal: 'left', vertical: 'middle' };
   worksheet.mergeCells(`B${currentRow}:D${currentRow}`);
   worksheet.getCell(`B${currentRow}`).value = new Date().toLocaleDateString('zh-CN');
+  worksheet.getCell(`B${currentRow}`).font = { ...DEFAULT_FONT };
   worksheet.getCell(`B${currentRow}`).alignment = { horizontal: 'left', vertical: 'middle' };
   worksheet.getCell(`E${currentRow}`).value = 'ORDER NO:';
+  worksheet.getCell(`E${currentRow}`).font = { ...DEFAULT_FONT };
   worksheet.getCell(`E${currentRow}`).alignment = { horizontal: 'left', vertical: 'middle' };
   worksheet.mergeCells(`F${currentRow}:${lastColLetter}${currentRow}`);
-  worksheet.getRow(currentRow).height = 20;
+  worksheet.getCell(`F${currentRow}`).font = { ...DEFAULT_FONT };
+  worksheet.getRow(currentRow).height = 36;
   currentRow++;
   
-  // ========== 第5行：Consignee 和 Notify ==========
+  // ========== 第5行：Consignee 和 Notify（字体10，行高36） ==========
   worksheet.mergeCells(`A${currentRow}:B${currentRow}`);
   worksheet.getCell(`A${currentRow}`).value = 'Consignee(ship to) :';
-  worksheet.getCell(`A${currentRow}`).font = { bold: true };
+  worksheet.getCell(`A${currentRow}`).font = { ...DEFAULT_FONT, bold: true };
   worksheet.getCell(`A${currentRow}`).alignment = { horizontal: 'left', vertical: 'middle' };
   worksheet.mergeCells(`C${currentRow}:D${currentRow}`);
   worksheet.getCell(`C${currentRow}`).value = customerName || '';
-  worksheet.getCell(`C${currentRow}`).font = { bold: true };
+  worksheet.getCell(`C${currentRow}`).font = { ...DEFAULT_FONT, bold: true };
   worksheet.getCell(`C${currentRow}`).alignment = { horizontal: 'left', vertical: 'middle' };
   worksheet.mergeCells(`E${currentRow}:${lastColLetter}${currentRow}`);
   worksheet.getCell(`E${currentRow}`).value = 'Notify(bill to) :Same as Consignee';
+  worksheet.getCell(`E${currentRow}`).font = { ...DEFAULT_FONT };
   worksheet.getCell(`E${currentRow}`).alignment = { horizontal: 'left', vertical: 'middle' };
-  worksheet.getRow(currentRow).height = 20;
+  worksheet.getRow(currentRow).height = 36;
   currentRow++;
   
-  // ========== 第6行：ADDRESS 和 LEAD TIME ==========
+  // ========== 第6行：ADDRESS 和 LEAD TIME（字体10，行高76） ==========
   worksheet.getCell(`A${currentRow}`).value = 'ADDRESS:';
+  worksheet.getCell(`A${currentRow}`).font = { ...DEFAULT_FONT };
   worksheet.getCell(`A${currentRow}`).alignment = { horizontal: 'left', vertical: 'middle' };
   worksheet.mergeCells(`B${currentRow}:D${currentRow}`);
   worksheet.getCell(`B${currentRow}`).value = customerAddress || '';
+  worksheet.getCell(`B${currentRow}`).font = { ...DEFAULT_FONT };
   worksheet.getCell(`B${currentRow}`).alignment = { horizontal: 'left', vertical: 'middle' };
   worksheet.mergeCells(`E${currentRow}:${lastColLetter}${currentRow}`);
   worksheet.getCell(`E${currentRow}`).value = 'LEAD TIME:                                                                      \nSHIPPING MARKS：   ';
+  worksheet.getCell(`E${currentRow}`).font = { ...DEFAULT_FONT };
   worksheet.getCell(`E${currentRow}`).alignment = { horizontal: 'left', vertical: 'middle', wrapText: true };
-  worksheet.getRow(currentRow).height = 30;
+  worksheet.getRow(currentRow).height = 76;
   currentRow++;
   
-  // ========== 第7行：PRICE TERM 等 ==========
+  // ========== 第7行：PRICE TERM 等（字体10，行高36） ==========
   worksheet.mergeCells(`A${currentRow}:B${currentRow}`);
   worksheet.getCell(`A${currentRow}`).value = 'PRICE TERM :    +EXW';
-  worksheet.getCell(`A${currentRow}`).font = { bold: true };
+  worksheet.getCell(`A${currentRow}`).font = { ...DEFAULT_FONT, bold: true };
   worksheet.getCell(`A${currentRow}`).alignment = { horizontal: 'center', vertical: 'middle' };
   worksheet.mergeCells(`C${currentRow}:D${currentRow}`);
   worksheet.getCell(`C${currentRow}`).value = 'PAYMENT:Alibaba/TT/Alipay';
-  worksheet.getCell(`C${currentRow}`).font = { bold: true };
+  worksheet.getCell(`C${currentRow}`).font = { ...DEFAULT_FONT, bold: true };
   worksheet.getCell(`C${currentRow}`).alignment = { horizontal: 'center', vertical: 'middle' };
   worksheet.getCell(`E${currentRow}`).value = 'SHIPPED VIA :';
-  worksheet.getCell(`E${currentRow}`).font = { bold: true };
+  worksheet.getCell(`E${currentRow}`).font = { ...DEFAULT_FONT, bold: true };
   worksheet.getCell(`E${currentRow}`).alignment = { horizontal: 'center', vertical: 'middle' };
   worksheet.mergeCells(`F${currentRow}:${lastColLetter}${currentRow}`);
   worksheet.getCell(`F${currentRow}`).value = 'DELIVERY TIME :';
-  worksheet.getCell(`F${currentRow}`).font = { bold: true };
+  worksheet.getCell(`F${currentRow}`).font = { ...DEFAULT_FONT, bold: true };
   worksheet.getCell(`F${currentRow}`).alignment = { horizontal: 'center', vertical: 'middle' };
-  worksheet.getRow(currentRow).height = 20;
+  worksheet.getRow(currentRow).height = 36;
   currentRow++;
   
-  // ========== 第8行：产品表格标题行 ==========
+  // ========== 第8行：产品表格标题行（字体10，行高36） ==========
   const headerRow = currentRow;
   const baseHeaders = ['No.', 'Item No.', 'Description', 'PICTURES', 'QTY/ SET', 'PRICE', 'AMOUNT'];
   const dimHeaders = ['L/cm', 'W/cm', 'H/cm', 'CBM/Per', 'CTN', 'CBM/m³', 'NW/kg', 'Note'];
@@ -248,11 +259,11 @@ export async function exportQuotationToExcel(options: ExportOptions): Promise<Bl
   headers.forEach((header, index) => {
     const cell = headerRowObj.getCell(index + 1);
     cell.value = header;
-    cell.font = { bold: true };
+    cell.font = { ...DEFAULT_FONT, bold: true };
     cell.alignment = { horizontal: 'center', vertical: 'middle' };
     setBorder(cell);
   });
-  headerRowObj.height = 25;
+  headerRowObj.height = 36;
   currentRow++;
   
   // ========== 预先获取所有图片 ==========
@@ -279,7 +290,7 @@ export async function exportQuotationToExcel(options: ExportOptions): Promise<Bl
   
   console.log(`共获取到 ${imageDataMap.size} 张图片`);
   
-  // ========== 产品数据行（第9行开始） ==========
+  // ========== 产品数据行（第9行开始，行高160） ==========
   const dataStartRow = currentRow;
   let totalAmount = 0;
   
@@ -294,16 +305,20 @@ export async function exportQuotationToExcel(options: ExportOptions): Promise<Bl
     
     // 基础列
     row.getCell(1).value = i + 1; // NO.
+    row.getCell(1).font = { ...DEFAULT_FONT };
     row.getCell(2).value = item.productCode; // Item No.
+    row.getCell(2).font = { ...DEFAULT_FONT };
     row.getCell(3).value = item.productName; // Description
+    row.getCell(3).font = { ...DEFAULT_FONT };
     // 图片列 (4) 后面添加
+    row.getCell(4).font = { ...DEFAULT_FONT };
     row.getCell(5).value = item.quantity; // QTY/SET
-    row.getCell(5).font = { bold: true };
+    row.getCell(5).font = { ...DEFAULT_FONT, bold: true };
     row.getCell(6).value = Number(unitPriceConverted.toFixed(2)); // PRICE
-    row.getCell(6).font = { bold: true };
+    row.getCell(6).font = { ...DEFAULT_FONT, bold: true };
     row.getCell(6).numFmt = `"${currencySymbol}"#,##0.00`;
     row.getCell(7).value = Number(subtotalConverted.toFixed(2)); // AMOUNT
-    row.getCell(7).font = { bold: true };
+    row.getCell(7).font = { ...DEFAULT_FONT, bold: true };
     row.getCell(7).numFmt = `"${currencySymbol}"#,##0.00`;
     
     if (includeDimensions) {
@@ -316,10 +331,13 @@ export async function exportQuotationToExcel(options: ExportOptions): Promise<Bl
       
       // L/cm
       row.getCell(8).value = length > 0 ? Math.round(length) : '';
+      row.getCell(8).font = { ...DEFAULT_FONT };
       // W/cm
       row.getCell(9).value = width > 0 ? Math.round(width) : '';
+      row.getCell(9).font = { ...DEFAULT_FONT };
       // H/cm
       row.getCell(10).value = height > 0 ? Math.round(height) : '';
+      row.getCell(10).font = { ...DEFAULT_FONT };
       // CBM/Per (单件体积)
       let cbmPer = 0;
       if (length > 0 && width > 0 && height > 0) {
@@ -328,21 +346,26 @@ export async function exportQuotationToExcel(options: ExportOptions): Promise<Bl
         cbmPer = unitVolume;
       }
       row.getCell(11).value = cbmPer > 0 ? Number(cbmPer.toFixed(6)) : '';
+      row.getCell(11).font = { ...DEFAULT_FONT };
       // CTN (箱数)
       const ctn = pcsPerCarton > 0 ? item.quantity / pcsPerCarton : 0;
       row.getCell(12).value = ctn > 0 ? Number(ctn.toFixed(2)) : '';
+      row.getCell(12).font = { ...DEFAULT_FONT };
       // CBM/m³ (总体积)
       const totalCbm = cbmPer * ctn;
       row.getCell(13).value = totalCbm > 0 ? Number(totalCbm.toFixed(6)) : '';
+      row.getCell(13).font = { ...DEFAULT_FONT };
       // NW/kg (总净重)
       const totalWeight = item.quantity * unitWeight;
       row.getCell(14).value = totalWeight > 0 ? Number(totalWeight.toFixed(2)) : '';
+      row.getCell(14).font = { ...DEFAULT_FONT };
       // Note
       row.getCell(15).value = item.note || '';
+      row.getCell(15).font = { ...DEFAULT_FONT };
     }
     
-    // 设置行样式
-    row.height = 60; // 产品行行高固定
+    // 设置行样式（产品行行高160）
+    row.height = 160;
     for (let col = 1; col <= totalColCount; col++) {
       const cell = row.getCell(col);
       cell.alignment = { horizontal: 'center', vertical: 'middle', wrapText: true };
@@ -374,125 +397,131 @@ export async function exportQuotationToExcel(options: ExportOptions): Promise<Bl
   
   currentRow = dataStartRow + items.length;
   
-  // ========== Total行 ==========
+  // ========== Total行（行高60） ==========
   worksheet.mergeCells(`A${currentRow}:F${currentRow}`);
   worksheet.getCell(`A${currentRow}`).value = 'Total';
-  worksheet.getCell(`A${currentRow}`).font = { bold: true };
+  worksheet.getCell(`A${currentRow}`).font = { ...DEFAULT_FONT, bold: true };
   worksheet.getCell(`A${currentRow}`).alignment = { horizontal: 'center', vertical: 'middle' };
   worksheet.getCell(`G${currentRow}`).value = Number(totalAmount.toFixed(2));
-  worksheet.getCell(`G${currentRow}`).font = { bold: true };
+  worksheet.getCell(`G${currentRow}`).font = { ...DEFAULT_FONT, bold: true };
   worksheet.getCell(`G${currentRow}`).numFmt = `"${currencySymbol}"#,##0.00`;
   worksheet.getCell(`G${currentRow}`).alignment = { horizontal: 'center', vertical: 'middle' };
   for (let col = 1; col <= baseColCount; col++) {
     setBorder(worksheet.getCell(currentRow, col));
   }
-  worksheet.getRow(currentRow).height = 22;
+  worksheet.getRow(currentRow).height = 60;
   currentRow++;
   
-  // ========== SAY行 ==========
+  // ========== SAY行（行高36） ==========
   worksheet.mergeCells(`A${currentRow}:B${currentRow}`);
   worksheet.getCell(`A${currentRow}`).value = 'SAY:';
-  worksheet.getCell(`A${currentRow}`).font = { bold: true };
+  worksheet.getCell(`A${currentRow}`).font = { ...DEFAULT_FONT, bold: true };
   worksheet.getCell(`A${currentRow}`).alignment = { horizontal: 'left', vertical: 'middle' };
   worksheet.mergeCells(`C${currentRow}:${lastColLetter}${currentRow}`);
+  worksheet.getCell(`C${currentRow}`).font = { ...DEFAULT_FONT };
   for (let col = 1; col <= totalColCount; col++) {
     setBorder(worksheet.getCell(currentRow, col));
   }
-  worksheet.getRow(currentRow).height = 22;
+  worksheet.getRow(currentRow).height = 36;
   currentRow++;
   
-  // ========== REMARK行 ==========
+  // ========== REMARK行（行高36） ==========
   worksheet.mergeCells(`A${currentRow}:B${currentRow}`);
   worksheet.getCell(`A${currentRow}`).value = 'REMARK:';
-  worksheet.getCell(`A${currentRow}`).font = { bold: true };
+  worksheet.getCell(`A${currentRow}`).font = { ...DEFAULT_FONT, bold: true };
   worksheet.getCell(`A${currentRow}`).alignment = { horizontal: 'left', vertical: 'middle' };
   worksheet.mergeCells(`C${currentRow}:${lastColLetter}${currentRow}`);
   worksheet.getCell(`C${currentRow}`).value = 'Payment details: PAY 30%  IN advance';
-  worksheet.getCell(`C${currentRow}`).font = { bold: true, color: { argb: 'FF0000' } };
+  worksheet.getCell(`C${currentRow}`).font = { ...DEFAULT_FONT, bold: true, color: { argb: 'FF0000' } };
   worksheet.getCell(`C${currentRow}`).alignment = { horizontal: 'center', vertical: 'middle' };
   for (let col = 1; col <= totalColCount; col++) {
     setBorder(worksheet.getCell(currentRow, col));
   }
-  worksheet.getRow(currentRow).height = 22;
+  worksheet.getRow(currentRow).height = 36;
   currentRow++;
   
-  // ========== 条款行1 ==========
+  // ========== 条款行1（行高36） ==========
   worksheet.getCell(`A${currentRow}`).value = 1;
-  worksheet.getCell(`A${currentRow}`).font = { bold: true };
+  worksheet.getCell(`A${currentRow}`).font = { ...DEFAULT_FONT, bold: true };
   worksheet.getCell(`A${currentRow}`).alignment = { horizontal: 'center', vertical: 'middle' };
   worksheet.getCell(`B${currentRow}`).value = 'Payment Terms:';
-  worksheet.getCell(`B${currentRow}`).font = { bold: true };
+  worksheet.getCell(`B${currentRow}`).font = { ...DEFAULT_FONT, bold: true };
   worksheet.getCell(`B${currentRow}`).alignment = { horizontal: 'left', vertical: 'middle' };
   worksheet.mergeCells(`C${currentRow}:${lastColLetter}${currentRow}`);
   worksheet.getCell(`C${currentRow}`).value = '30%';
-  worksheet.getCell(`C${currentRow}`).font = { bold: true, color: { argb: 'FF0000' } };
+  worksheet.getCell(`C${currentRow}`).font = { ...DEFAULT_FONT, bold: true, color: { argb: 'FF0000' } };
   worksheet.getCell(`C${currentRow}`).alignment = { horizontal: 'center', vertical: 'middle' };
   for (let col = 1; col <= totalColCount; col++) {
     setBorder(worksheet.getCell(currentRow, col));
   }
-  worksheet.getRow(currentRow).height = 22;
+  worksheet.getRow(currentRow).height = 36;
   currentRow++;
   
-  // ========== 条款行2 ==========
+  // ========== 条款行2（行高36） ==========
   worksheet.getCell(`A${currentRow}`).value = 2;
-  worksheet.getCell(`A${currentRow}`).font = { bold: true };
+  worksheet.getCell(`A${currentRow}`).font = { ...DEFAULT_FONT, bold: true };
   worksheet.getCell(`A${currentRow}`).alignment = { horizontal: 'center', vertical: 'middle' };
   worksheet.getCell(`B${currentRow}`).value = 'Trade Terms:';
-  worksheet.getCell(`B${currentRow}`).font = { bold: true };
+  worksheet.getCell(`B${currentRow}`).font = { ...DEFAULT_FONT, bold: true };
   worksheet.getCell(`B${currentRow}`).alignment = { horizontal: 'left', vertical: 'middle' };
   worksheet.mergeCells(`C${currentRow}:${lastColLetter}${currentRow}`);
   worksheet.getCell(`C${currentRow}`).value = 'EXW Trade Term';
-  worksheet.getCell(`C${currentRow}`).font = { bold: true, color: { argb: 'FF0000' } };
+  worksheet.getCell(`C${currentRow}`).font = { ...DEFAULT_FONT, bold: true, color: { argb: 'FF0000' } };
   worksheet.getCell(`C${currentRow}`).alignment = { horizontal: 'left', vertical: 'middle' };
   for (let col = 1; col <= totalColCount; col++) {
     setBorder(worksheet.getCell(currentRow, col));
   }
-  worksheet.getRow(currentRow).height = 22;
+  worksheet.getRow(currentRow).height = 36;
   currentRow++;
   
-  // ========== 条款行3 ==========
+  // ========== 条款行3（行高36） ==========
   worksheet.getCell(`A${currentRow}`).value = 3;
-  worksheet.getCell(`A${currentRow}`).font = { bold: true };
+  worksheet.getCell(`A${currentRow}`).font = { ...DEFAULT_FONT, bold: true };
   worksheet.getCell(`A${currentRow}`).alignment = { horizontal: 'center', vertical: 'middle' };
   worksheet.getCell(`B${currentRow}`).value = 'Delivery:';
-  worksheet.getCell(`B${currentRow}`).font = { bold: true };
+  worksheet.getCell(`B${currentRow}`).font = { ...DEFAULT_FONT, bold: true };
   worksheet.getCell(`B${currentRow}`).alignment = { horizontal: 'left', vertical: 'middle' };
   worksheet.mergeCells(`C${currentRow}:${lastColLetter}${currentRow}`);
   worksheet.getCell(`C${currentRow}`).value = 'Within 1 week after deposit';
+  worksheet.getCell(`C${currentRow}`).font = { ...DEFAULT_FONT };
   worksheet.getCell(`C${currentRow}`).alignment = { horizontal: 'left', vertical: 'middle' };
   for (let col = 1; col <= totalColCount; col++) {
     setBorder(worksheet.getCell(currentRow, col));
   }
-  worksheet.getRow(currentRow).height = 22;
+  worksheet.getRow(currentRow).height = 36;
   currentRow++;
   
-  // ========== 银行信息标题行 ==========
+  // ========== 银行信息标题行（行高36） ==========
   worksheet.mergeCells(`A${currentRow}:${lastColLetter}${currentRow}`);
   worksheet.getCell(`A${currentRow}`).value = 'Bank information:';
+  worksheet.getCell(`A${currentRow}`).font = { ...DEFAULT_FONT };
   worksheet.getCell(`A${currentRow}`).alignment = { horizontal: 'left', vertical: 'middle' };
   for (let col = 1; col <= totalColCount; col++) {
     setBorder(worksheet.getCell(currentRow, col));
   }
-  worksheet.getRow(currentRow).height = 22;
+  worksheet.getRow(currentRow).height = 36;
   currentRow++;
   
-  // ========== 签名行 ==========
+  // ========== 签名行（行高36） ==========
   worksheet.mergeCells(`A${currentRow}:B${currentRow}`);
   worksheet.getCell(`A${currentRow}`).value = 'The Buyer';
-  worksheet.getCell(`A${currentRow}`).font = { bold: true };
+  worksheet.getCell(`A${currentRow}`).font = { ...DEFAULT_FONT, bold: true };
   worksheet.getCell(`A${currentRow}`).alignment = { horizontal: 'left', vertical: 'middle' };
   worksheet.mergeCells(`C${currentRow}:D${currentRow}`);
   worksheet.getCell(`C${currentRow}`).value = customerName || '';
+  worksheet.getCell(`C${currentRow}`).font = { ...DEFAULT_FONT };
   worksheet.getCell(`C${currentRow}`).alignment = { horizontal: 'left', vertical: 'middle' };
   worksheet.getCell(`E${currentRow}`).value = 'Seller:';
+  worksheet.getCell(`E${currentRow}`).font = { ...DEFAULT_FONT };
   worksheet.getCell(`E${currentRow}`).alignment = { horizontal: 'left', vertical: 'middle' };
   worksheet.mergeCells(`F${currentRow}:${lastColLetter}${currentRow}`);
   worksheet.getCell(`F${currentRow}`).value = 'Guangzhou Explorer Auto Parts Co., Ltd';
+  worksheet.getCell(`F${currentRow}`).font = { ...DEFAULT_FONT };
   worksheet.getCell(`F${currentRow}`).alignment = { horizontal: 'left', vertical: 'middle' };
   for (let col = 1; col <= totalColCount; col++) {
     setBorder(worksheet.getCell(currentRow, col));
   }
-  worksheet.getRow(currentRow).height = 22;
+  worksheet.getRow(currentRow).height = 36;
   const signatureRow = currentRow;
   
   // ========== 设置外边框加粗 ==========
