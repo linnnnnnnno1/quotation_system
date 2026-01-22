@@ -406,7 +406,7 @@ export async function exportQuotationToExcel(options: ExportOptions): Promise<Bl
         // 水平居中偏移: (175-146)/2 = 14.5像素，转换为列单位: 14.5/175 ≈ 0.083
         // 垂直居中偏移: (120-102)/2 = 9像素，转换为行单位: 9/120 ≈ 0.075
         const colOffset = 0.083; // 水平居中偏移
-        const rowOffset = 0.075; // 垂直居中偏移
+        const rowOffset = 0.03; // 垂直偏移（向上调整）
         
         // 使用tl+ext定位方式，保持图片原始尺寸不变
         worksheet.addImage(imageId, {
