@@ -10,7 +10,7 @@ import { Textarea } from "@/components/ui/textarea";
 import { trpc } from "@/lib/trpc";
 import { CUSTOMER_LEVELS, CURRENCIES, DEFAULT_EXCHANGE_RATE, CustomerLevel, CurrencyType } from "@/const";
 import { exportQuotationToExcel, QuotationItem } from "@/utils/excelExport";
-import { ArrowLeft, ArrowRight, Download, Plus, Trash2, Search, Image as ImageIcon } from "lucide-react";
+import { ArrowLeft, ArrowRight, Download, Plus, Trash2, Search, Image as ImageIcon, RefreshCw, Loader2 } from "lucide-react";
 import { useState, useMemo, useEffect } from "react";
 import { toast } from "sonner";
 
@@ -21,9 +21,8 @@ interface QuotationItemLocal {
   productName: string;
   imageUrl?: string | null;
   quantity: number;
-  customerLevel: CustomerLevel; // 每个产品单独的客户级别
+  customerLevel: CustomerLevel;
   unitPrice: number;
-  // 存储所有价格，方便切换客户级别时更新
   retailPrice: number;
   smallBPrice: number;
   largeBPrice: number;
@@ -44,6 +43,8 @@ export default function QuotationFlow() {
   
   // Step 1: 批量输入
   const [batchInput, setBatchInput] = useState('');
+  const [searchMode, setSearchMode] = useState<'code' | 'name'>('code');
+  const [step1SearchKeyword, setStep1SearchKeyword] = useState('');
   
   // Step 2: 预览编辑
   const [items, setItems] = useState<QuotationItemLocal[]>([]);
@@ -51,6 +52,7 @@ export default function QuotationFlow() {
   const [exchangeRate, setExchangeRate] = useState(DEFAULT_EXCHANGE_RATE);
   const [includeDimensions, setIncludeDimensions] = useState(false);
   const [defaultCustomerLevel, setDefaultCustomerLevel] = useState<CustomerLevel>('retail');
+  const [isLoadingRate, setIsLoadingRate] = useState(false);
   
   // 搜索产品
   const [searchKeyword, setSearchKeyword] = useState('');
@@ -59,15 +61,69 @@ export default function QuotationFlow() {
   
   const recordExportMutation = trpc.exports.record.useMutation();
   
-  // 本地搜索产品（基于已加载的产品列表）
+  // Step 1 产品名称搜索结果
+  const step1SearchResults = useMemo(() => {
+    if (!step1SearchKeyword.trim() || !allProducts) return [];
+    const keyword = step1SearchKeyword.toLowerCase().trim();
+    return allProducts.filter(p => 
+      p.productCode.toLowerCase().includes(keyword) ||
+      p.productName.toLowerCase().includes(keyword)
+    ).slice(0, 15);
+  }, [step1SearchKeyword, allProducts]);
+  
+  // Step 2 本地搜索产品
   const searchResults = useMemo(() => {
     if (!searchKeyword.trim() || !allProducts) return [];
     const keyword = searchKeyword.toLowerCase().trim();
     return allProducts.filter(p => 
       p.productCode.toLowerCase().includes(keyword) ||
       p.productName.toLowerCase().includes(keyword)
-    ).slice(0, 10); // 最多显示10个结果
+    ).slice(0, 10);
   }, [searchKeyword, allProducts]);
+  
+  // 获取实时汇率
+  const fetchExchangeRate = async () => {
+    setIsLoadingRate(true);
+    try {
+      // 使用免费的汇率API
+      const response = await fetch('https://cdn.jsdelivr.net/npm/@fawazahmed0/currency-api@latest/v1/currencies/usd.json');
+      if (response.ok) {
+        const data = await response.json();
+        if (data.usd && data.usd.cny) {
+          const rate = data.usd.cny;
+          setExchangeRate(Number(rate.toFixed(4)));
+          toast.success(`汇率已更新: 1 USD = ${rate.toFixed(4)} CNY`);
+          return;
+        }
+      }
+      
+      // 备用API
+      const backupResponse = await fetch('https://open.er-api.com/v6/latest/USD');
+      if (backupResponse.ok) {
+        const backupData = await backupResponse.json();
+        if (backupData.rates && backupData.rates.CNY) {
+          const rate = backupData.rates.CNY;
+          setExchangeRate(Number(rate.toFixed(4)));
+          toast.success(`汇率已更新: 1 USD = ${rate.toFixed(4)} CNY`);
+          return;
+        }
+      }
+      
+      toast.error('获取汇率失败，使用默认汇率');
+    } catch (error) {
+      console.error('Failed to fetch exchange rate:', error);
+      toast.error('获取汇率失败，使用默认汇率');
+    } finally {
+      setIsLoadingRate(false);
+    }
+  };
+  
+  // 进入第2步时自动获取汇率
+  useEffect(() => {
+    if (step === 2 && currency === 'USD') {
+      fetchExchangeRate();
+    }
+  }, [step]);
   
   // 根据客户级别获取价格
   const getPriceByLevel = (product: any, level: CustomerLevel): number => {
@@ -146,6 +202,15 @@ export default function QuotationFlow() {
     } else if (lines.length > 0) {
       toast.error('未找到任何有效产品，请检查产品编号是否正确');
     }
+  };
+  
+  // 从搜索结果添加产品到批量输入
+  const addToInputFromSearch = (product: any) => {
+    const currentInput = batchInput.trim();
+    const newLine = `${product.productCode} 1`;
+    setBatchInput(currentInput ? `${currentInput}\n${newLine}` : newLine);
+    setStep1SearchKeyword('');
+    toast.success(`已添加 ${product.productCode} 到输入框`);
   };
   
   // 添加搜索到的产品
@@ -250,6 +315,7 @@ export default function QuotationFlow() {
         quantity: item.quantity,
         unitPrice: item.unitPrice,
         subtotal: item.unitPrice * item.quantity,
+        customerLevel: item.customerLevel,
         length: item.length,
         width: item.width,
         height: item.height,
@@ -259,16 +325,24 @@ export default function QuotationFlow() {
         note: item.note,
       }));
       
-      // 图片代理函数
+      // 图片代理函数 - 使用正确的tRPC调用格式
       const imageProxyFn = async (url: string): Promise<string | null> => {
         try {
-          const response = await fetch(`/api/trpc/imageProxy?input=${encodeURIComponent(JSON.stringify(url))}`);
+          // 正确的tRPC batch格式
+          const input = encodeURIComponent(JSON.stringify({ "0": { "json": url } }));
+          const response = await fetch(`/api/trpc/imageProxy?batch=1&input=${input}`);
           const data = await response.json();
-          if (data.result?.data?.success) {
-            return data.result.data.data;
+          
+          // 处理batch响应格式
+          if (data && data[0] && data[0].result && data[0].result.data && data[0].result.data.json) {
+            const result = data[0].result.data.json;
+            if (result.success) {
+              return result.data;
+            }
           }
           return null;
-        } catch {
+        } catch (error) {
+          console.error('Image proxy error:', error);
           return null;
         }
       };
@@ -347,6 +421,51 @@ export default function QuotationFlow() {
               </div>
             )}
             
+            {/* 产品搜索功能 */}
+            <div className="space-y-2">
+              <Label>搜索产品（按编号或名称）</Label>
+              <div className="relative">
+                <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+                <Input
+                  placeholder="输入产品编号或名称搜索..."
+                  value={step1SearchKeyword}
+                  onChange={(e) => setStep1SearchKeyword(e.target.value)}
+                  className="pl-9"
+                />
+                {step1SearchResults.length > 0 && step1SearchKeyword && (
+                  <div className="absolute top-full left-0 right-0 mt-1 bg-background border rounded-lg shadow-lg z-10 max-h-60 overflow-auto">
+                    {step1SearchResults.map((product) => (
+                      <div
+                        key={product.id}
+                        className="p-3 hover:bg-muted cursor-pointer flex items-center justify-between"
+                        onClick={() => addToInputFromSearch(product)}
+                      >
+                        <div className="flex items-center gap-3">
+                          {product.imageUrl ? (
+                            <img src={product.imageUrl} alt="" className="w-8 h-8 object-cover rounded" />
+                          ) : (
+                            <div className="w-8 h-8 bg-muted rounded flex items-center justify-center">
+                              <ImageIcon className="h-4 w-4 text-muted-foreground" />
+                            </div>
+                          )}
+                          <div>
+                            <span className="font-medium">{product.productCode}</span>
+                            <span className="text-muted-foreground ml-2">{product.productName}</span>
+                          </div>
+                        </div>
+                        <Plus className="h-4 w-4" />
+                      </div>
+                    ))}
+                  </div>
+                )}
+                {step1SearchKeyword && step1SearchResults.length === 0 && !isLoadingProducts && (
+                  <div className="absolute top-full left-0 right-0 mt-1 bg-background border rounded-lg shadow-lg z-10 p-3 text-muted-foreground">
+                    未找到匹配的产品
+                  </div>
+                )}
+              </div>
+            </div>
+            
             <div className="space-y-2">
               <Label>产品列表</Label>
               <Textarea
@@ -385,7 +504,12 @@ export default function QuotationFlow() {
             <div className="flex flex-wrap items-center gap-4 p-4 bg-muted/50 rounded-lg">
               <div className="flex items-center gap-2">
                 <Label>货币</Label>
-                <Select value={currency} onValueChange={(v) => setCurrency(v as CurrencyType)}>
+                <Select value={currency} onValueChange={(v) => {
+                  setCurrency(v as CurrencyType);
+                  if (v === 'USD') {
+                    fetchExchangeRate();
+                  }
+                }}>
                   <SelectTrigger className="w-32">
                     <SelectValue />
                   </SelectTrigger>
@@ -399,14 +523,28 @@ export default function QuotationFlow() {
               
               {currency === 'USD' && (
                 <div className="flex items-center gap-2">
-                  <Label>汇率</Label>
+                  <Label>汇率 (1 USD =</Label>
                   <Input
                     type="number"
                     value={exchangeRate}
                     onChange={(e) => setExchangeRate(parseFloat(e.target.value) || DEFAULT_EXCHANGE_RATE)}
                     className="w-24"
-                    step="0.01"
+                    step="0.0001"
                   />
+                  <span className="text-sm">CNY)</span>
+                  <Button 
+                    variant="outline" 
+                    size="icon" 
+                    onClick={fetchExchangeRate}
+                    disabled={isLoadingRate}
+                    title="获取实时汇率"
+                  >
+                    {isLoadingRate ? (
+                      <Loader2 className="h-4 w-4 animate-spin" />
+                    ) : (
+                      <RefreshCw className="h-4 w-4" />
+                    )}
+                  </Button>
                 </div>
               )}
               
@@ -450,9 +588,18 @@ export default function QuotationFlow() {
                       className="p-3 hover:bg-muted cursor-pointer flex items-center justify-between"
                       onClick={() => addProduct(product)}
                     >
-                      <div>
-                        <span className="font-medium">{product.productCode}</span>
-                        <span className="text-muted-foreground ml-2">{product.productName}</span>
+                      <div className="flex items-center gap-3">
+                        {product.imageUrl ? (
+                          <img src={product.imageUrl} alt="" className="w-8 h-8 object-cover rounded" />
+                        ) : (
+                          <div className="w-8 h-8 bg-muted rounded flex items-center justify-center">
+                            <ImageIcon className="h-4 w-4 text-muted-foreground" />
+                          </div>
+                        )}
+                        <div>
+                          <span className="font-medium">{product.productCode}</span>
+                          <span className="text-muted-foreground ml-2">{product.productName}</span>
+                        </div>
                       </div>
                       <Plus className="h-4 w-4" />
                     </div>
@@ -466,26 +613,28 @@ export default function QuotationFlow() {
               )}
             </div>
             
-            {/* 产品列表 */}
-            <div className="border rounded-lg overflow-hidden">
+            {/* 产品列表 - 调整列顺序 */}
+            <div className="border rounded-lg overflow-x-auto">
               <Table>
                 <TableHeader>
                   <TableRow>
-                    <TableHead className="w-16">图片</TableHead>
                     <TableHead>产品编号</TableHead>
                     <TableHead>产品名称</TableHead>
+                    <TableHead className="w-16">图片</TableHead>
                     <TableHead className="w-32">客户级别</TableHead>
-                    {includeDimensions && <TableHead>尺寸</TableHead>}
-                    {includeDimensions && <TableHead>装箱数</TableHead>}
                     <TableHead className="text-center w-24">数量</TableHead>
                     <TableHead className="text-right">单价</TableHead>
                     <TableHead className="text-right">金额</TableHead>
+                    {includeDimensions && <TableHead className="text-center">一箱X套</TableHead>}
+                    {includeDimensions && <TableHead>尺寸</TableHead>}
                     <TableHead className="w-16"></TableHead>
                   </TableRow>
                 </TableHeader>
                 <TableBody>
                   {items.map((item) => (
                     <TableRow key={item.id}>
+                      <TableCell className="font-medium">{item.productCode}</TableCell>
+                      <TableCell>{item.productName}</TableCell>
                       <TableCell>
                         {item.imageUrl ? (
                           <img 
@@ -499,8 +648,6 @@ export default function QuotationFlow() {
                           </div>
                         )}
                       </TableCell>
-                      <TableCell className="font-medium">{item.productCode}</TableCell>
-                      <TableCell>{item.productName}</TableCell>
                       <TableCell>
                         <Select 
                           value={item.customerLevel} 
@@ -516,8 +663,6 @@ export default function QuotationFlow() {
                           </SelectContent>
                         </Select>
                       </TableCell>
-                      {includeDimensions && <TableCell>{getDimensionDisplay(item)}</TableCell>}
-                      {includeDimensions && <TableCell>{item.pcsPerCarton || '-'}</TableCell>}
                       <TableCell className="text-center">
                         <Input
                           type="number"
@@ -531,6 +676,12 @@ export default function QuotationFlow() {
                       <TableCell className="text-right font-medium">
                         {formatPrice(item.unitPrice * item.quantity)}
                       </TableCell>
+                      {includeDimensions && (
+                        <TableCell className="text-center">
+                          {item.pcsPerCarton ? `一箱${item.pcsPerCarton}套` : '-'}
+                        </TableCell>
+                      )}
+                      {includeDimensions && <TableCell>{getDimensionDisplay(item)}</TableCell>}
                       <TableCell>
                         <Button variant="ghost" size="icon" onClick={() => removeItem(item.id)}>
                           <Trash2 className="h-4 w-4 text-destructive" />
@@ -540,7 +691,7 @@ export default function QuotationFlow() {
                   ))}
                   {items.length === 0 && (
                     <TableRow>
-                      <TableCell colSpan={includeDimensions ? 11 : 9} className="text-center py-8 text-muted-foreground">
+                      <TableCell colSpan={includeDimensions ? 10 : 8} className="text-center py-8 text-muted-foreground">
                         暂无产品，请在上方搜索添加或返回上一步批量输入
                       </TableCell>
                     </TableRow>
@@ -596,6 +747,12 @@ export default function QuotationFlow() {
                 <Label className="text-muted-foreground">货币</Label>
                 <p className="text-lg">{CURRENCIES[currency].name}</p>
               </div>
+              {currency === 'USD' && (
+                <div className="space-y-2">
+                  <Label className="text-muted-foreground">汇率</Label>
+                  <p className="text-lg">1 USD = {exchangeRate} CNY</p>
+                </div>
+              )}
               <div className="space-y-2">
                 <Label className="text-muted-foreground">包含尺寸信息</Label>
                 <p className="text-lg">{includeDimensions ? '是' : '否'}</p>
