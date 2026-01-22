@@ -1,0 +1,1 @@
+ALTER TABLE `products` MODIFY COLUMN `pcsPerCarton` decimal(10,2);

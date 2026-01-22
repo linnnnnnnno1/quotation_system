@@ -15,6 +15,13 @@
       "when": 1769048702136,
       "tag": "0001_bitter_prowler",
       "breakpoints": true
+    },
+    {
+      "idx": 2,
+      "version": "5",
+      "when": 1769058953496,
+      "tag": "0002_dear_mariko_yashida",
+      "breakpoints": true
     }
   ]
 }

@@ -25,7 +25,7 @@ interface ProductFormData {
   length: string;
   width: string;
   height: string;
-  pcsPerCarton: number;
+  pcsPerCarton: string;
   unitWeight: string;
   unitVolume: string;
   note: string;
@@ -44,7 +44,7 @@ const emptyFormData: ProductFormData = {
   length: '',
   width: '',
   height: '',
-  pcsPerCarton: 0,
+  pcsPerCarton: '',
   unitWeight: '',
   unitVolume: '',
   note: '',
@@ -116,7 +116,7 @@ export default function ProductManagement() {
         length: product.length || '',
         width: product.width || '',
         height: product.height || '',
-        pcsPerCarton: product.pcsPerCarton || 0,
+        pcsPerCarton: product.pcsPerCarton || '',
         unitWeight: product.unitWeight || '',
         unitVolume: product.unitVolume || '',
         note: product.note || '',
@@ -420,8 +420,11 @@ export default function ProductManagement() {
                     <Input
                       type="number"
                       value={formData.pcsPerCarton}
-                      onChange={(e) => updateFormField('pcsPerCarton', parseInt(e.target.value) || 0)}
-                      placeholder="每箱数量"
+                      onChange={(e) => updateFormField('pcsPerCarton', e.target.value)}
+                      placeholder="每箱数量（支持小数，如0.2, 5.5）"
+                      step="0.01"
+                      min="0"
+                      max="10000"
                     />
                   </div>
                   <div className="space-y-2">

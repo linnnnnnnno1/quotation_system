@@ -12,7 +12,7 @@ export interface QuotationItem {
   length?: string | null;
   width?: string | null;
   height?: string | null;
-  pcsPerCarton?: number | null;
+  pcsPerCarton?: string | null;
   unitWeight?: string | null;
   unitVolume?: string | null;
   note?: string | null;
@@ -23,6 +23,8 @@ export interface ExportOptions {
   currency: 'CNY' | 'USD';
   exchangeRate: number;
   includeDimensions: boolean;
+  customerName?: string;
+  customerAddress?: string;
   companyInfo?: {
     companyName?: string;
     address?: string;
@@ -44,7 +46,6 @@ async function imageUrlToBase64(
     if (proxyFn) {
       const result = await proxyFn(url);
       if (result) {
-        // 解析data URL获取扩展名
         const match = result.match(/^data:image\/(\w+);base64,(.+)$/);
         if (match) {
           const ext = match[1].toLowerCase();
@@ -52,12 +53,11 @@ async function imageUrlToBase64(
           const extension = ext === 'png' ? 'png' : ext === 'gif' ? 'gif' : 'jpeg';
           return { base64: base64Data, extension };
         }
-        // 如果没有前缀，假设是jpeg
         return { base64: result, extension: 'jpeg' };
       }
     }
     
-    // 直接尝试fetch（可能会因CORS失败）
+    // 直接尝试fetch
     const response = await fetch(url, { mode: 'cors' });
     if (!response.ok) return null;
     
@@ -85,93 +85,164 @@ async function imageUrlToBase64(
   }
 }
 
+// 设置单元格边框
+function setBorder(cell: ExcelJS.Cell, style: 'thin' | 'medium' = 'thin') {
+  cell.border = {
+    top: { style },
+    left: { style },
+    bottom: { style },
+    right: { style }
+  };
+}
+
+// 设置外边框加粗
+function setOuterBorder(worksheet: ExcelJS.Worksheet, startRow: number, endRow: number, startCol: number, endCol: number) {
+  for (let row = startRow; row <= endRow; row++) {
+    for (let col = startCol; col <= endCol; col++) {
+      const cell = worksheet.getCell(row, col);
+      const border: Partial<ExcelJS.Borders> = {
+        top: { style: row === startRow ? 'medium' : 'thin' },
+        bottom: { style: row === endRow ? 'medium' : 'thin' },
+        left: { style: col === startCol ? 'medium' : 'thin' },
+        right: { style: col === endCol ? 'medium' : 'thin' }
+      };
+      cell.border = border;
+    }
+  }
+}
+
 export async function exportQuotationToExcel(options: ExportOptions): Promise<Blob> {
-  const { items, currency, exchangeRate, includeDimensions, companyInfo, imageProxyFn } = options;
+  const { items, currency, exchangeRate, includeDimensions, customerName, customerAddress, companyInfo, imageProxyFn } = options;
   
   const workbook = new ExcelJS.Workbook();
   const worksheet = workbook.addWorksheet('报价单');
   
-  const currencySymbol = currency === 'CNY' ? '¥' : '$';
+  const currencySymbol = currency === 'CNY' ? '￥' : '$';
   const rate = currency === 'CNY' ? 1 : exchangeRate;
   
-  // 设置列宽 - 按新顺序：产品编号、产品名称、图片、客户级别、数量、单价、金额、一箱X套、尺寸
-  const baseColumns = [
-    { width: 8.93 },   // A - 序号
-    { width: 15.53 },  // B - 产品编号
-    { width: 19.07 },  // C - 产品名称
-    { width: 15 },     // D - 图片
-    { width: 10 },     // E - 客户级别
-    { width: 10 },     // F - 数量
-    { width: 15.73 },  // G - 单价
-    { width: 19.73 },  // H - 金额
-  ];
+  // 基础列数（A-G）
+  const baseColCount = 7;
+  // 尺寸列数（H-O）
+  const dimColCount = includeDimensions ? 8 : 0;
+  const totalColCount = baseColCount + dimColCount;
+  const lastColLetter = includeDimensions ? 'O' : 'G';
   
-  const dimensionColumns = [
-    { width: 12 },  // I - 一箱X套
-    { width: 18 },  // J - 尺寸
-  ];
+  // 设置列宽
+  worksheet.getColumn(1).width = 5;    // A - NO.
+  worksheet.getColumn(2).width = 16;   // B - Item No.
+  worksheet.getColumn(3).width = 25;   // C - Description
+  worksheet.getColumn(4).width = 12;   // D - PICTURES
+  worksheet.getColumn(5).width = 10;   // E - QTY/SET
+  worksheet.getColumn(6).width = 12;   // F - PRICE
+  worksheet.getColumn(7).width = 14;   // G - AMOUNT
   
-  worksheet.columns = includeDimensions 
-    ? [...baseColumns, ...dimensionColumns]
-    : baseColumns;
-  
-  // 公司信息头部
-  let currentRow = 1;
-  const lastCol = includeDimensions ? 'J' : 'H';
-  
-  // 行1 - 公司名称
-  worksheet.mergeCells(`A${currentRow}:${lastCol}${currentRow}`);
-  const companyCell = worksheet.getCell(`A${currentRow}`);
-  companyCell.value = companyInfo?.companyName || 'Company Name';
-  companyCell.font = { size: 16, bold: true, color: { argb: '0000FF' } };
-  companyCell.alignment = { horizontal: 'center', vertical: 'middle' };
-  worksheet.getRow(currentRow).height = 26.6;
-  currentRow++;
-  
-  // 行2 - 报价单标题
-  worksheet.mergeCells(`A${currentRow}:${lastCol}${currentRow}`);
-  const titleCell = worksheet.getCell(`A${currentRow}`);
-  titleCell.value = 'QUOTATION';
-  titleCell.font = { size: 14, bold: true };
-  titleCell.alignment = { horizontal: 'center', vertical: 'middle' };
-  worksheet.getRow(currentRow).height = 27.6;
-  currentRow++;
-  
-  // 行3 - 日期
-  worksheet.mergeCells(`A${currentRow}:${lastCol}${currentRow}`);
-  const dateCell = worksheet.getCell(`A${currentRow}`);
-  dateCell.value = `Date: ${new Date().toLocaleDateString()}`;
-  dateCell.font = { underline: true };
-  dateCell.alignment = { horizontal: 'left', vertical: 'middle' };
-  worksheet.getRow(currentRow).height = 23.1;
-  currentRow++;
-  
-  // 行4-7 - 客户信息区域
-  for (let i = 0; i < 4; i++) {
-    worksheet.getRow(currentRow + i).height = 20.3;
-  }
-  
-  worksheet.mergeCells(`A${currentRow}:D${currentRow}`);
-  worksheet.getCell(`A${currentRow}`).value = 'To:';
-  worksheet.getCell(`E${currentRow}`).value = 'Notify:';
-  currentRow++;
-  
-  worksheet.getCell(`A${currentRow}`).value = 'Address';
-  worksheet.getCell(`E${currentRow}`).value = 'Shipping Marks:';
-  currentRow++;
-  
-  worksheet.mergeCells(`A${currentRow}:B${currentRow}`);
-  worksheet.mergeCells(`C${currentRow}:D${currentRow}`);
-  worksheet.getCell(`E${currentRow}`).value = 'Shipped VIA:';
-  currentRow++;
-  currentRow++;
-  
-  // 表头行 - 新顺序
-  const headerRow = currentRow;
-  const headers = ['No.', 'Item No.', 'Description', 'Image', 'Level', 'QTY', `Unit Price(${currencySymbol})`, `Amount(${currencySymbol})`];
   if (includeDimensions) {
-    headers.push('一箱X套', '尺寸 (L×W×H cm)');
+    worksheet.getColumn(8).width = 8;   // H - L/cm
+    worksheet.getColumn(9).width = 8;   // I - W/cm
+    worksheet.getColumn(10).width = 8;  // J - H/cm
+    worksheet.getColumn(11).width = 10; // K - CBM/Per (m³)
+    worksheet.getColumn(12).width = 8;  // L - CTN
+    worksheet.getColumn(13).width = 10; // M - CBM/m³
+    worksheet.getColumn(14).width = 10; // N - NW/kg
+    worksheet.getColumn(15).width = 15; // O - Note
   }
+  
+  let currentRow = 1;
+  
+  // ========== 第1行：公司名称 ==========
+  worksheet.mergeCells(`A${currentRow}:${lastColLetter}${currentRow}`);
+  const companyCell = worksheet.getCell(`A${currentRow}`);
+  companyCell.value = companyInfo?.companyName || 'GUANGZHOU EXPLORER AUTO PARTS CO.,LTD.';
+  companyCell.font = { bold: true, color: { argb: '0000FF' } };
+  companyCell.alignment = { horizontal: 'center', vertical: 'middle' };
+  worksheet.getRow(currentRow).height = 22;
+  currentRow++;
+  
+  // ========== 第2行：公司地址（小6号字） ==========
+  worksheet.mergeCells(`A${currentRow}:${lastColLetter}${currentRow}`);
+  const addressCell = worksheet.getCell(`A${currentRow}`);
+  const companyAddress = companyInfo?.address || 'ADD: No. 25 Daling Road, Daling, Baiyun District, Guangzhou City, Guangdong Province';
+  const contactInfo = companyInfo?.phone && companyInfo?.email 
+    ? `\n${companyInfo.phone}      Email: ${companyInfo.email}`
+    : '\nChuang Lin 0086 18826074914      Email: linchuanglc@163.com';
+  addressCell.value = companyAddress + contactInfo;
+  addressCell.font = { size: 8 };
+  addressCell.alignment = { horizontal: 'center', vertical: 'middle', wrapText: true };
+  worksheet.getRow(currentRow).height = 30;
+  currentRow++;
+  
+  // ========== 第3行：PROFORMA INVOICE ==========
+  worksheet.mergeCells(`A${currentRow}:${lastColLetter}${currentRow}`);
+  const titleCell = worksheet.getCell(`A${currentRow}`);
+  titleCell.value = 'PROFORMA INVOICE';
+  titleCell.font = { bold: true, underline: true };
+  titleCell.alignment = { horizontal: 'center', vertical: 'middle' };
+  worksheet.getRow(currentRow).height = 22;
+  currentRow++;
+  
+  // ========== 第4行：DATE 和 ORDER NO ==========
+  worksheet.getCell(`A${currentRow}`).value = 'DATE:';
+  worksheet.getCell(`A${currentRow}`).alignment = { horizontal: 'left', vertical: 'middle' };
+  worksheet.mergeCells(`B${currentRow}:D${currentRow}`);
+  worksheet.getCell(`B${currentRow}`).value = new Date().toLocaleDateString('zh-CN');
+  worksheet.getCell(`B${currentRow}`).alignment = { horizontal: 'left', vertical: 'middle' };
+  worksheet.getCell(`E${currentRow}`).value = 'ORDER NO:';
+  worksheet.getCell(`E${currentRow}`).alignment = { horizontal: 'left', vertical: 'middle' };
+  worksheet.mergeCells(`F${currentRow}:${lastColLetter}${currentRow}`);
+  worksheet.getRow(currentRow).height = 20;
+  currentRow++;
+  
+  // ========== 第5行：Consignee 和 Notify ==========
+  worksheet.mergeCells(`A${currentRow}:B${currentRow}`);
+  worksheet.getCell(`A${currentRow}`).value = 'Consignee(ship to) :';
+  worksheet.getCell(`A${currentRow}`).font = { bold: true };
+  worksheet.getCell(`A${currentRow}`).alignment = { horizontal: 'left', vertical: 'middle' };
+  worksheet.mergeCells(`C${currentRow}:D${currentRow}`);
+  worksheet.getCell(`C${currentRow}`).value = customerName || '';
+  worksheet.getCell(`C${currentRow}`).font = { bold: true };
+  worksheet.getCell(`C${currentRow}`).alignment = { horizontal: 'left', vertical: 'middle' };
+  worksheet.mergeCells(`E${currentRow}:${lastColLetter}${currentRow}`);
+  worksheet.getCell(`E${currentRow}`).value = 'Notify(bill to) :Same as Consignee';
+  worksheet.getCell(`E${currentRow}`).alignment = { horizontal: 'left', vertical: 'middle' };
+  worksheet.getRow(currentRow).height = 20;
+  currentRow++;
+  
+  // ========== 第6行：ADDRESS 和 LEAD TIME ==========
+  worksheet.getCell(`A${currentRow}`).value = 'ADDRESS:';
+  worksheet.getCell(`A${currentRow}`).alignment = { horizontal: 'left', vertical: 'middle' };
+  worksheet.mergeCells(`B${currentRow}:D${currentRow}`);
+  worksheet.getCell(`B${currentRow}`).value = customerAddress || '';
+  worksheet.getCell(`B${currentRow}`).alignment = { horizontal: 'left', vertical: 'middle' };
+  worksheet.mergeCells(`E${currentRow}:${lastColLetter}${currentRow}`);
+  worksheet.getCell(`E${currentRow}`).value = 'LEAD TIME:                                                                      \nSHIPPING MARKS：   ';
+  worksheet.getCell(`E${currentRow}`).alignment = { horizontal: 'left', vertical: 'middle', wrapText: true };
+  worksheet.getRow(currentRow).height = 30;
+  currentRow++;
+  
+  // ========== 第7行：PRICE TERM 等 ==========
+  worksheet.mergeCells(`A${currentRow}:B${currentRow}`);
+  worksheet.getCell(`A${currentRow}`).value = 'PRICE TERM :    +EXW';
+  worksheet.getCell(`A${currentRow}`).font = { bold: true };
+  worksheet.getCell(`A${currentRow}`).alignment = { horizontal: 'center', vertical: 'middle' };
+  worksheet.mergeCells(`C${currentRow}:D${currentRow}`);
+  worksheet.getCell(`C${currentRow}`).value = 'PAYMENT:Alibaba/TT/Alipay';
+  worksheet.getCell(`C${currentRow}`).font = { bold: true };
+  worksheet.getCell(`C${currentRow}`).alignment = { horizontal: 'center', vertical: 'middle' };
+  worksheet.getCell(`E${currentRow}`).value = 'SHIPPED VIA :';
+  worksheet.getCell(`E${currentRow}`).font = { bold: true };
+  worksheet.getCell(`E${currentRow}`).alignment = { horizontal: 'center', vertical: 'middle' };
+  worksheet.mergeCells(`F${currentRow}:${lastColLetter}${currentRow}`);
+  worksheet.getCell(`F${currentRow}`).value = 'DELIVERY TIME :';
+  worksheet.getCell(`F${currentRow}`).font = { bold: true };
+  worksheet.getCell(`F${currentRow}`).alignment = { horizontal: 'center', vertical: 'middle' };
+  worksheet.getRow(currentRow).height = 20;
+  currentRow++;
+  
+  // ========== 第8行：产品表格标题行 ==========
+  const headerRow = currentRow;
+  const baseHeaders = ['No.', 'Item No.', 'Description', 'PICTURES', 'QTY/ SET', 'PRICE', 'AMOUNT'];
+  const dimHeaders = ['L/cm', 'W/cm', 'H/cm', 'CBM/Per', 'CTN', 'CBM/m³', 'NW/kg', 'Note'];
+  const headers = includeDimensions ? [...baseHeaders, ...dimHeaders] : baseHeaders;
   
   const headerRowObj = worksheet.getRow(headerRow);
   headers.forEach((header, index) => {
@@ -179,22 +250,12 @@ export async function exportQuotationToExcel(options: ExportOptions): Promise<Bl
     cell.value = header;
     cell.font = { bold: true };
     cell.alignment = { horizontal: 'center', vertical: 'middle' };
-    cell.fill = {
-      type: 'pattern',
-      pattern: 'solid',
-      fgColor: { argb: 'E0E0E0' }
-    };
-    cell.border = {
-      top: { style: 'thin' },
-      left: { style: 'thin' },
-      bottom: { style: 'thin' },
-      right: { style: 'thin' }
-    };
+    setBorder(cell);
   });
-  headerRowObj.height = 31.5;
+  headerRowObj.height = 25;
   currentRow++;
   
-  // 预先获取所有图片
+  // ========== 预先获取所有图片 ==========
   console.log('开始获取图片...');
   const imageDataMap = new Map<number, { base64: string; extension: 'jpeg' | 'png' | 'gif' }>();
   
@@ -218,8 +279,10 @@ export async function exportQuotationToExcel(options: ExportOptions): Promise<Bl
   
   console.log(`共获取到 ${imageDataMap.size} 张图片`);
   
-  // 数据行
+  // ========== 产品数据行（第9行开始） ==========
+  const dataStartRow = currentRow;
   let totalAmount = 0;
+  
   for (let i = 0; i < items.length; i++) {
     const item = items[i];
     const rowNum = currentRow + i;
@@ -229,57 +292,78 @@ export async function exportQuotationToExcel(options: ExportOptions): Promise<Bl
     const subtotalConverted = item.subtotal / 100 / rate;
     totalAmount += subtotalConverted;
     
-    // 新列顺序
-    row.getCell(1).value = i + 1; // 序号
-    row.getCell(2).value = item.productCode; // 产品编号
-    row.getCell(3).value = item.productName; // 产品名称
+    // 基础列
+    row.getCell(1).value = i + 1; // NO.
+    row.getCell(2).value = item.productCode; // Item No.
+    row.getCell(3).value = item.productName; // Description
     // 图片列 (4) 后面添加
-    row.getCell(5).value = item.customerLevel ? CUSTOMER_LEVELS[item.customerLevel] : '零售价'; // 客户级别
-    row.getCell(6).value = item.quantity; // 数量
-    row.getCell(7).value = Number(unitPriceConverted.toFixed(2)); // 单价
-    row.getCell(8).value = Number(subtotalConverted.toFixed(2)); // 金额
+    row.getCell(5).value = item.quantity; // QTY/SET
+    row.getCell(5).font = { bold: true };
+    row.getCell(6).value = Number(unitPriceConverted.toFixed(2)); // PRICE
+    row.getCell(6).font = { bold: true };
+    row.getCell(6).numFmt = `"${currencySymbol}"#,##0.00`;
+    row.getCell(7).value = Number(subtotalConverted.toFixed(2)); // AMOUNT
+    row.getCell(7).font = { bold: true };
+    row.getCell(7).numFmt = `"${currencySymbol}"#,##0.00`;
     
     if (includeDimensions) {
-      // 一箱X套
-      row.getCell(9).value = item.pcsPerCarton ? `一箱${item.pcsPerCarton}套` : '';
+      const length = item.length ? parseFloat(item.length) : 0;
+      const width = item.width ? parseFloat(item.width) : 0;
+      const height = item.height ? parseFloat(item.height) : 0;
+      const pcsPerCarton = item.pcsPerCarton ? parseFloat(item.pcsPerCarton) : 1;
+      const unitWeight = item.unitWeight ? parseFloat(item.unitWeight) : 0;
+      const unitVolume = item.unitVolume ? parseFloat(item.unitVolume) : 0;
       
-      // 尺寸
-      const dimension = (item.length && item.width && item.height)
-        ? `${item.length}×${item.width}×${item.height}`
-        : (item.note || '');
-      row.getCell(10).value = dimension;
+      // L/cm
+      row.getCell(8).value = length > 0 ? Math.round(length) : '';
+      // W/cm
+      row.getCell(9).value = width > 0 ? Math.round(width) : '';
+      // H/cm
+      row.getCell(10).value = height > 0 ? Math.round(height) : '';
+      // CBM/Per (单件体积)
+      let cbmPer = 0;
+      if (length > 0 && width > 0 && height > 0) {
+        cbmPer = (length * width * height) / 1000000;
+      } else if (unitVolume > 0) {
+        cbmPer = unitVolume;
+      }
+      row.getCell(11).value = cbmPer > 0 ? Number(cbmPer.toFixed(6)) : '';
+      // CTN (箱数)
+      const ctn = pcsPerCarton > 0 ? item.quantity / pcsPerCarton : 0;
+      row.getCell(12).value = ctn > 0 ? Number(ctn.toFixed(2)) : '';
+      // CBM/m³ (总体积)
+      const totalCbm = cbmPer * ctn;
+      row.getCell(13).value = totalCbm > 0 ? Number(totalCbm.toFixed(6)) : '';
+      // NW/kg (总净重)
+      const totalWeight = item.quantity * unitWeight;
+      row.getCell(14).value = totalWeight > 0 ? Number(totalWeight.toFixed(2)) : '';
+      // Note
+      row.getCell(15).value = item.note || '';
     }
     
-    // 设置行高和样式
-    row.height = 80;
-    const colCount = includeDimensions ? 10 : 8;
-    for (let col = 1; col <= colCount; col++) {
+    // 设置行样式
+    row.height = 60; // 产品行行高固定
+    for (let col = 1; col <= totalColCount; col++) {
       const cell = row.getCell(col);
       cell.alignment = { horizontal: 'center', vertical: 'middle', wrapText: true };
-      cell.border = {
-        top: { style: 'thin' },
-        left: { style: 'thin' },
-        bottom: { style: 'thin' },
-        right: { style: 'thin' }
-      };
+      setBorder(cell);
     }
   }
   
-  // 添加图片
+  // 添加图片到D列
   for (let i = 0; i < items.length; i++) {
     const imageData = imageDataMap.get(i);
     if (imageData) {
-      const rowNum = currentRow + i;
+      const rowNum = dataStartRow + i;
       try {
         const imageId = workbook.addImage({
           base64: imageData.base64,
           extension: imageData.extension,
         });
         
-        // 图片放在D列（索引3）
         worksheet.addImage(imageId, {
-          tl: { col: 3.1, row: rowNum - 0.9 } as any,
-          br: { col: 3.9, row: rowNum - 0.1 } as any,
+          tl: { col: 3.05, row: rowNum - 0.95 } as any,
+          br: { col: 3.95, row: rowNum - 0.05 } as any,
         });
         console.log(`图片 ${i + 1} 已添加到Excel`);
       } catch (error) {
@@ -288,28 +372,136 @@ export async function exportQuotationToExcel(options: ExportOptions): Promise<Bl
     }
   }
   
-  currentRow += items.length;
+  currentRow = dataStartRow + items.length;
   
-  // Total行
-  const totalRow = worksheet.getRow(currentRow);
-  const totalColCount = includeDimensions ? 10 : 8;
-  worksheet.mergeCells(`A${currentRow}:G${currentRow}`);
-  totalRow.getCell(1).value = 'TOTAL';
-  totalRow.getCell(1).font = { bold: true };
-  totalRow.getCell(1).alignment = { horizontal: 'right', vertical: 'middle' };
-  totalRow.getCell(8).value = Number(totalAmount.toFixed(2));
-  totalRow.getCell(8).font = { bold: true };
-  totalRow.getCell(8).alignment = { horizontal: 'center', vertical: 'middle' };
-  totalRow.height = 30;
+  // ========== Total行 ==========
+  worksheet.mergeCells(`A${currentRow}:F${currentRow}`);
+  worksheet.getCell(`A${currentRow}`).value = 'Total';
+  worksheet.getCell(`A${currentRow}`).font = { bold: true };
+  worksheet.getCell(`A${currentRow}`).alignment = { horizontal: 'center', vertical: 'middle' };
+  worksheet.getCell(`G${currentRow}`).value = Number(totalAmount.toFixed(2));
+  worksheet.getCell(`G${currentRow}`).font = { bold: true };
+  worksheet.getCell(`G${currentRow}`).numFmt = `"${currencySymbol}"#,##0.00`;
+  worksheet.getCell(`G${currentRow}`).alignment = { horizontal: 'center', vertical: 'middle' };
+  for (let col = 1; col <= baseColCount; col++) {
+    setBorder(worksheet.getCell(currentRow, col));
+  }
+  worksheet.getRow(currentRow).height = 22;
+  currentRow++;
   
-  // 设置边框
+  // ========== SAY行 ==========
+  worksheet.mergeCells(`A${currentRow}:B${currentRow}`);
+  worksheet.getCell(`A${currentRow}`).value = 'SAY:';
+  worksheet.getCell(`A${currentRow}`).font = { bold: true };
+  worksheet.getCell(`A${currentRow}`).alignment = { horizontal: 'left', vertical: 'middle' };
+  worksheet.mergeCells(`C${currentRow}:${lastColLetter}${currentRow}`);
   for (let col = 1; col <= totalColCount; col++) {
-    totalRow.getCell(col).border = {
-      top: { style: 'thin' },
-      left: { style: 'thin' },
-      bottom: { style: 'thin' },
-      right: { style: 'thin' }
-    };
+    setBorder(worksheet.getCell(currentRow, col));
+  }
+  worksheet.getRow(currentRow).height = 22;
+  currentRow++;
+  
+  // ========== REMARK行 ==========
+  worksheet.mergeCells(`A${currentRow}:B${currentRow}`);
+  worksheet.getCell(`A${currentRow}`).value = 'REMARK:';
+  worksheet.getCell(`A${currentRow}`).font = { bold: true };
+  worksheet.getCell(`A${currentRow}`).alignment = { horizontal: 'left', vertical: 'middle' };
+  worksheet.mergeCells(`C${currentRow}:${lastColLetter}${currentRow}`);
+  worksheet.getCell(`C${currentRow}`).value = 'Payment details: PAY 30%  IN advance';
+  worksheet.getCell(`C${currentRow}`).font = { bold: true, color: { argb: 'FF0000' } };
+  worksheet.getCell(`C${currentRow}`).alignment = { horizontal: 'center', vertical: 'middle' };
+  for (let col = 1; col <= totalColCount; col++) {
+    setBorder(worksheet.getCell(currentRow, col));
+  }
+  worksheet.getRow(currentRow).height = 22;
+  currentRow++;
+  
+  // ========== 条款行1 ==========
+  worksheet.getCell(`A${currentRow}`).value = 1;
+  worksheet.getCell(`A${currentRow}`).font = { bold: true };
+  worksheet.getCell(`A${currentRow}`).alignment = { horizontal: 'center', vertical: 'middle' };
+  worksheet.getCell(`B${currentRow}`).value = 'Payment Terms:';
+  worksheet.getCell(`B${currentRow}`).font = { bold: true };
+  worksheet.getCell(`B${currentRow}`).alignment = { horizontal: 'left', vertical: 'middle' };
+  worksheet.mergeCells(`C${currentRow}:${lastColLetter}${currentRow}`);
+  worksheet.getCell(`C${currentRow}`).value = '30%';
+  worksheet.getCell(`C${currentRow}`).font = { bold: true, color: { argb: 'FF0000' } };
+  worksheet.getCell(`C${currentRow}`).alignment = { horizontal: 'center', vertical: 'middle' };
+  for (let col = 1; col <= totalColCount; col++) {
+    setBorder(worksheet.getCell(currentRow, col));
+  }
+  worksheet.getRow(currentRow).height = 22;
+  currentRow++;
+  
+  // ========== 条款行2 ==========
+  worksheet.getCell(`A${currentRow}`).value = 2;
+  worksheet.getCell(`A${currentRow}`).font = { bold: true };
+  worksheet.getCell(`A${currentRow}`).alignment = { horizontal: 'center', vertical: 'middle' };
+  worksheet.getCell(`B${currentRow}`).value = 'Trade Terms:';
+  worksheet.getCell(`B${currentRow}`).font = { bold: true };
+  worksheet.getCell(`B${currentRow}`).alignment = { horizontal: 'left', vertical: 'middle' };
+  worksheet.mergeCells(`C${currentRow}:${lastColLetter}${currentRow}`);
+  worksheet.getCell(`C${currentRow}`).value = 'EXW Trade Term';
+  worksheet.getCell(`C${currentRow}`).font = { bold: true, color: { argb: 'FF0000' } };
+  worksheet.getCell(`C${currentRow}`).alignment = { horizontal: 'left', vertical: 'middle' };
+  for (let col = 1; col <= totalColCount; col++) {
+    setBorder(worksheet.getCell(currentRow, col));
+  }
+  worksheet.getRow(currentRow).height = 22;
+  currentRow++;
+  
+  // ========== 条款行3 ==========
+  worksheet.getCell(`A${currentRow}`).value = 3;
+  worksheet.getCell(`A${currentRow}`).font = { bold: true };
+  worksheet.getCell(`A${currentRow}`).alignment = { horizontal: 'center', vertical: 'middle' };
+  worksheet.getCell(`B${currentRow}`).value = 'Delivery:';
+  worksheet.getCell(`B${currentRow}`).font = { bold: true };
+  worksheet.getCell(`B${currentRow}`).alignment = { horizontal: 'left', vertical: 'middle' };
+  worksheet.mergeCells(`C${currentRow}:${lastColLetter}${currentRow}`);
+  worksheet.getCell(`C${currentRow}`).value = 'Within 1 week after deposit';
+  worksheet.getCell(`C${currentRow}`).alignment = { horizontal: 'left', vertical: 'middle' };
+  for (let col = 1; col <= totalColCount; col++) {
+    setBorder(worksheet.getCell(currentRow, col));
+  }
+  worksheet.getRow(currentRow).height = 22;
+  currentRow++;
+  
+  // ========== 银行信息标题行 ==========
+  worksheet.mergeCells(`A${currentRow}:${lastColLetter}${currentRow}`);
+  worksheet.getCell(`A${currentRow}`).value = 'Bank information:';
+  worksheet.getCell(`A${currentRow}`).alignment = { horizontal: 'left', vertical: 'middle' };
+  for (let col = 1; col <= totalColCount; col++) {
+    setBorder(worksheet.getCell(currentRow, col));
+  }
+  worksheet.getRow(currentRow).height = 22;
+  currentRow++;
+  
+  // ========== 签名行 ==========
+  worksheet.mergeCells(`A${currentRow}:B${currentRow}`);
+  worksheet.getCell(`A${currentRow}`).value = 'The Buyer';
+  worksheet.getCell(`A${currentRow}`).font = { bold: true };
+  worksheet.getCell(`A${currentRow}`).alignment = { horizontal: 'left', vertical: 'middle' };
+  worksheet.mergeCells(`C${currentRow}:D${currentRow}`);
+  worksheet.getCell(`C${currentRow}`).value = customerName || '';
+  worksheet.getCell(`C${currentRow}`).alignment = { horizontal: 'left', vertical: 'middle' };
+  worksheet.getCell(`E${currentRow}`).value = 'Seller:';
+  worksheet.getCell(`E${currentRow}`).alignment = { horizontal: 'left', vertical: 'middle' };
+  worksheet.mergeCells(`F${currentRow}:${lastColLetter}${currentRow}`);
+  worksheet.getCell(`F${currentRow}`).value = 'Guangzhou Explorer Auto Parts Co., Ltd';
+  worksheet.getCell(`F${currentRow}`).alignment = { horizontal: 'left', vertical: 'middle' };
+  for (let col = 1; col <= totalColCount; col++) {
+    setBorder(worksheet.getCell(currentRow, col));
+  }
+  worksheet.getRow(currentRow).height = 22;
+  const signatureRow = currentRow;
+  
+  // ========== 设置外边框加粗 ==========
+  // 基础区域 A1:G{signatureRow}
+  setOuterBorder(worksheet, 1, signatureRow, 1, baseColCount);
+  
+  // 如果有尺寸信息，为尺寸区域设置边框
+  if (includeDimensions) {
+    setOuterBorder(worksheet, headerRow, signatureRow, 8, totalColCount);
   }
   
   // 生成文件

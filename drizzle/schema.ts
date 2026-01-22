@@ -36,7 +36,7 @@ export const products = mysqlTable("products", {
   length: decimal("length", { precision: 10, scale: 2 }), // 长度（厘米）
   width: decimal("width", { precision: 10, scale: 2 }), // 宽度（厘米）
   height: decimal("height", { precision: 10, scale: 2 }), // 高度（厘米）
-  pcsPerCarton: int("pcsPerCarton"), // 每箱数量
+  pcsPerCarton: decimal("pcsPerCarton", { precision: 10, scale: 2 }), // 每箱数量（支持小数）
   unitWeight: decimal("unitWeight", { precision: 10, scale: 2 }), // 单件重量（千克）
   unitVolume: decimal("unitVolume", { precision: 10, scale: 4 }), // 单件体积（立方米）
   note: text("note"), // 备注

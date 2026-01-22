@@ -45,3 +45,16 @@
 - [x] 预览编辑处添加实时汇率获取功能（人民币/美元）
 - [x] 调整预览编辑列顺序：产品编号、产品名称、图片、客户级别、数量、单价、金额、一箱X套、尺寸
 - [x] 修复Excel导出图片功能（图片代理接口400错误）
+
+## 功能优化 v3 - Excel模板重构
+- [x] 导出步骤增加客户名称输入框（选填）
+- [x] 导出步骤增加客户地址输入框（选填）
+- [x] 产品管理中每箱数量支持小数（0-10000范围）
+- [x] Excel表头：公司名称（蓝色加粗）、公司地址（小6号字）、PROFORMA INVOICE
+- [x] Excel第4-7行：日期、ORDER NO、客户信息、价格条款等
+- [x] Excel产品表格标题行：NO., Item No., Description, PICTURES, QTY/SET, PRICE, AMOUNT
+- [x] Excel尺寸信息列（可选）：L/cm, W/cm, H/cm, CBM/Per, CTN, CBM/m³, NW/kg, Note
+- [x] Excel汇总行：Total、SAY、REMARK、条款行、银行信息、签名行
+- [x] Excel边框设置：内外边框，外边框加粗
+- [x] 图片嵌入到D列并适应单元格大小
+- [x] 金额数字加粗，货币符号正确显示

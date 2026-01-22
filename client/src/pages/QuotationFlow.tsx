@@ -31,7 +31,7 @@ interface QuotationItemLocal {
   length?: string | null;
   width?: string | null;
   height?: string | null;
-  pcsPerCarton?: number | null;
+  pcsPerCarton?: string | null;
   unitWeight?: string | null;
   unitVolume?: string | null;
   note?: string | null;
@@ -53,6 +53,10 @@ export default function QuotationFlow() {
   const [includeDimensions, setIncludeDimensions] = useState(false);
   const [defaultCustomerLevel, setDefaultCustomerLevel] = useState<CustomerLevel>('retail');
   const [isLoadingRate, setIsLoadingRate] = useState(false);
+  
+  // Step 3: 导出
+  const [customerName, setCustomerName] = useState('');
+  const [customerAddress, setCustomerAddress] = useState('');
   
   // 搜索产品
   const [searchKeyword, setSearchKeyword] = useState('');
@@ -352,6 +356,8 @@ export default function QuotationFlow() {
         currency,
         exchangeRate,
         includeDimensions,
+        customerName: customerName || undefined,
+        customerAddress: customerAddress || undefined,
         companyInfo: companyInfo ? {
           companyName: companyInfo.companyName,
           address: companyInfo.address || undefined,
@@ -730,10 +736,31 @@ export default function QuotationFlow() {
           <CardHeader>
             <CardTitle>导出报价单</CardTitle>
             <CardDescription>
-              确认信息无误后，点击导出按钮下载Excel报价单
+              填写客户信息（选填），确认无误后点击导出按钮下载Excel报价单
             </CardDescription>
           </CardHeader>
           <CardContent className="space-y-6">
+            {/* 客户信息输入 */}
+            <div className="grid grid-cols-2 gap-4 p-4 bg-muted/50 rounded-lg">
+              <div className="space-y-2">
+                <Label>客户名称（选填）</Label>
+                <Input
+                  value={customerName}
+                  onChange={(e) => setCustomerName(e.target.value)}
+                  placeholder="输入客户名称"
+                />
+              </div>
+              <div className="space-y-2">
+                <Label>客户地址（选填）</Label>
+                <Input
+                  value={customerAddress}
+                  onChange={(e) => setCustomerAddress(e.target.value)}
+                  placeholder="输入客户地址"
+                />
+              </div>
+            </div>
+            
+            {/* 报价单摘要 */}
             <div className="grid grid-cols-2 gap-6">
               <div className="space-y-2">
                 <Label className="text-muted-foreground">产品数量</Label>

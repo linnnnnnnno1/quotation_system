@@ -198,7 +198,7 @@ export async function updateProductNonPrice(id: number, data: {
   length?: string | null;
   width?: string | null;
   height?: string | null;
-  pcsPerCarton?: number | null;
+  pcsPerCarton?: string | null;
   unitWeight?: string | null;
   unitVolume?: string | null;
   note?: string | null;
