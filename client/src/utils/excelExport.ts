@@ -37,6 +37,11 @@ export interface ExportOptions {
 // 默认字体设置
 const DEFAULT_FONT: Partial<ExcelJS.Font> = { name: 'Calibri', size: 10 };
 
+// 背景色定义
+const LIGHT_GRAY_15: ExcelJS.Fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'D9D9D9' } }; // 浅灰色15%
+const LIGHT_BLUE: ExcelJS.Fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'DAEEF3' } }; // 浅蓝色
+const LIGHT_ORANGE: ExcelJS.Fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FDE9D9' } }; // 浅橙色
+
 // 将图片URL转换为base64
 async function imageUrlToBase64(
   url: string, 
@@ -152,11 +157,11 @@ export async function exportQuotationToExcel(options: ExportOptions): Promise<Bl
   
   let currentRow = 1;
   
-  // ========== 第1行：公司名称（字体14，行高52） ==========
+  // ========== 第1行：公司名称（字体16，行高52） ==========
   worksheet.mergeCells(`A${currentRow}:${lastColLetter}${currentRow}`);
   const companyCell = worksheet.getCell(`A${currentRow}`);
   companyCell.value = companyInfo?.companyName || 'GUANGZHOU EXPLORER AUTO PARTS CO.,LTD.';
-  companyCell.font = { name: 'Calibri', size: 14, bold: true, color: { argb: '0000FF' } };
+  companyCell.font = { name: 'Calibri', size: 16, bold: true, color: { argb: '0000FF' } };
   companyCell.alignment = { horizontal: 'center', vertical: 'middle' };
   worksheet.getRow(currentRow).height = 52;
   currentRow++;
@@ -174,32 +179,32 @@ export async function exportQuotationToExcel(options: ExportOptions): Promise<Bl
   worksheet.getRow(currentRow).height = 52;
   currentRow++;
   
-  // ========== 第3行：PROFORMA INVOICE（字体10，行高52） ==========
+  // ========== 第3行：PROFORMA INVOICE（字体18，行高52） ==========
   worksheet.mergeCells(`A${currentRow}:${lastColLetter}${currentRow}`);
   const titleCell = worksheet.getCell(`A${currentRow}`);
   titleCell.value = 'PROFORMA INVOICE';
-  titleCell.font = { name: 'Calibri', size: 10, bold: true, underline: true };
+  titleCell.font = { name: 'Calibri', size: 18, bold: true, underline: true };
   titleCell.alignment = { horizontal: 'center', vertical: 'middle' };
   worksheet.getRow(currentRow).height = 52;
   currentRow++;
   
-  // ========== 第4行：DATE 和 ORDER NO（字体10，行高36） ==========
+  // ========== 第4行：DATE 和 ORDER NO（字体10加粗，行高36） ==========
   worksheet.getCell(`A${currentRow}`).value = 'DATE:';
-  worksheet.getCell(`A${currentRow}`).font = { ...DEFAULT_FONT };
+  worksheet.getCell(`A${currentRow}`).font = { ...DEFAULT_FONT, bold: true };
   worksheet.getCell(`A${currentRow}`).alignment = { horizontal: 'left', vertical: 'middle' };
   worksheet.mergeCells(`B${currentRow}:D${currentRow}`);
   worksheet.getCell(`B${currentRow}`).value = new Date().toLocaleDateString('zh-CN');
-  worksheet.getCell(`B${currentRow}`).font = { ...DEFAULT_FONT };
+  worksheet.getCell(`B${currentRow}`).font = { ...DEFAULT_FONT, bold: true };
   worksheet.getCell(`B${currentRow}`).alignment = { horizontal: 'left', vertical: 'middle' };
   worksheet.getCell(`E${currentRow}`).value = 'ORDER NO:';
-  worksheet.getCell(`E${currentRow}`).font = { ...DEFAULT_FONT };
+  worksheet.getCell(`E${currentRow}`).font = { ...DEFAULT_FONT, bold: true };
   worksheet.getCell(`E${currentRow}`).alignment = { horizontal: 'left', vertical: 'middle' };
   worksheet.mergeCells(`F${currentRow}:${lastColLetter}${currentRow}`);
-  worksheet.getCell(`F${currentRow}`).font = { ...DEFAULT_FONT };
+  worksheet.getCell(`F${currentRow}`).font = { ...DEFAULT_FONT, bold: true };
   worksheet.getRow(currentRow).height = 36;
   currentRow++;
   
-  // ========== 第5行：Consignee 和 Notify（字体10，行高36） ==========
+  // ========== 第5行：Consignee 和 Notify（字体10加粗，行高36） ==========
   worksheet.mergeCells(`A${currentRow}:B${currentRow}`);
   worksheet.getCell(`A${currentRow}`).value = 'Consignee(ship to) :';
   worksheet.getCell(`A${currentRow}`).font = { ...DEFAULT_FONT, bold: true };
@@ -210,22 +215,22 @@ export async function exportQuotationToExcel(options: ExportOptions): Promise<Bl
   worksheet.getCell(`C${currentRow}`).alignment = { horizontal: 'left', vertical: 'middle' };
   worksheet.mergeCells(`E${currentRow}:${lastColLetter}${currentRow}`);
   worksheet.getCell(`E${currentRow}`).value = 'Notify(bill to) :Same as Consignee';
-  worksheet.getCell(`E${currentRow}`).font = { ...DEFAULT_FONT };
+  worksheet.getCell(`E${currentRow}`).font = { ...DEFAULT_FONT, bold: true };
   worksheet.getCell(`E${currentRow}`).alignment = { horizontal: 'left', vertical: 'middle' };
   worksheet.getRow(currentRow).height = 36;
   currentRow++;
   
-  // ========== 第6行：ADDRESS 和 LEAD TIME（字体10，行高76） ==========
+  // ========== 第6行：ADDRESS 和 LEAD TIME（字体10加粗，行高76） ==========
   worksheet.getCell(`A${currentRow}`).value = 'ADDRESS:';
-  worksheet.getCell(`A${currentRow}`).font = { ...DEFAULT_FONT };
+  worksheet.getCell(`A${currentRow}`).font = { ...DEFAULT_FONT, bold: true };
   worksheet.getCell(`A${currentRow}`).alignment = { horizontal: 'left', vertical: 'middle' };
   worksheet.mergeCells(`B${currentRow}:D${currentRow}`);
   worksheet.getCell(`B${currentRow}`).value = customerAddress || '';
-  worksheet.getCell(`B${currentRow}`).font = { ...DEFAULT_FONT };
+  worksheet.getCell(`B${currentRow}`).font = { ...DEFAULT_FONT, bold: true };
   worksheet.getCell(`B${currentRow}`).alignment = { horizontal: 'left', vertical: 'middle' };
   worksheet.mergeCells(`E${currentRow}:${lastColLetter}${currentRow}`);
   worksheet.getCell(`E${currentRow}`).value = 'LEAD TIME:                                                                      \nSHIPPING MARKS：   ';
-  worksheet.getCell(`E${currentRow}`).font = { ...DEFAULT_FONT };
+  worksheet.getCell(`E${currentRow}`).font = { ...DEFAULT_FONT, bold: true };
   worksheet.getCell(`E${currentRow}`).alignment = { horizontal: 'left', vertical: 'middle', wrapText: true };
   worksheet.getRow(currentRow).height = 76;
   currentRow++;
@@ -249,7 +254,7 @@ export async function exportQuotationToExcel(options: ExportOptions): Promise<Bl
   worksheet.getRow(currentRow).height = 36;
   currentRow++;
   
-  // ========== 第8行：产品表格标题行（字体10，行高36） ==========
+  // ========== 第8行：产品表格标题行（字体10，行高36，背景色） ==========
   const headerRow = currentRow;
   const baseHeaders = ['No.', 'Item No.', 'Description', 'PICTURES', 'QTY/ SET', 'PRICE', 'AMOUNT'];
   const dimHeaders = ['L/cm', 'W/cm', 'H/cm', 'CBM/Per', 'CTN', 'CBM/m³', 'NW/kg', 'Note'];
@@ -262,6 +267,10 @@ export async function exportQuotationToExcel(options: ExportOptions): Promise<Bl
     cell.font = { ...DEFAULT_FONT, bold: true };
     cell.alignment = { horizontal: 'center', vertical: 'middle' };
     setBorder(cell);
+    // 设置背景色：A-G列
+    if (index < 7) {
+      cell.fill = includeDimensions ? LIGHT_BLUE : LIGHT_GRAY_15;
+    }
   });
   headerRowObj.height = 36;
   currentRow++;
@@ -293,6 +302,7 @@ export async function exportQuotationToExcel(options: ExportOptions): Promise<Bl
   // ========== 产品数据行（第9行开始，行高160） ==========
   const dataStartRow = currentRow;
   let totalAmount = 0;
+  let totalCbmSum = 0; // 用于计算CBM/m³总和
   
   for (let i = 0; i < items.length; i++) {
     const item = items[i];
@@ -355,6 +365,7 @@ export async function exportQuotationToExcel(options: ExportOptions): Promise<Bl
       const totalCbm = cbmPer * ctn;
       row.getCell(13).value = totalCbm > 0 ? Number(totalCbm.toFixed(6)) : '';
       row.getCell(13).font = { ...DEFAULT_FONT };
+      totalCbmSum += totalCbm; // 累加CBM/m³
       // NW/kg (总净重)
       const totalWeight = item.quantity * unitWeight;
       row.getCell(14).value = totalWeight > 0 ? Number(totalWeight.toFixed(2)) : '';
@@ -374,7 +385,6 @@ export async function exportQuotationToExcel(options: ExportOptions): Promise<Bl
   }
   
   // 添加图片到D列（D列是第4列，索引为3）
-  // 行高160对应约120像素，列宽23.33对应约175像素
   for (let i = 0; i < items.length; i++) {
     const imageData = imageDataMap.get(i);
     if (imageData) {
@@ -385,9 +395,6 @@ export async function exportQuotationToExcel(options: ExportOptions): Promise<Bl
           extension: imageData.extension,
         });
         
-        // 使用tl和ext方式定位图片，指定固定的像素尺寸
-        // 列宽23.33 ≈ 175像素，行高160 ≈ 120像素
-        // 留一点边距，图片尺寸设为 165x115
         worksheet.addImage(imageId, {
           tl: { col: 3, row: rowNum - 1 },
           ext: { width: 146, height: 102 },
@@ -401,12 +408,18 @@ export async function exportQuotationToExcel(options: ExportOptions): Promise<Bl
   }
   
   currentRow = dataStartRow + items.length;
+  const totalRow = currentRow;
   
-  // ========== Total行（行高60） ==========
+  // ========== Total行（行高60，A-F浅橙色背景） ==========
   worksheet.mergeCells(`A${currentRow}:F${currentRow}`);
   worksheet.getCell(`A${currentRow}`).value = 'Total';
   worksheet.getCell(`A${currentRow}`).font = { ...DEFAULT_FONT, bold: true };
   worksheet.getCell(`A${currentRow}`).alignment = { horizontal: 'center', vertical: 'middle' };
+  worksheet.getCell(`A${currentRow}`).fill = LIGHT_ORANGE;
+  // 设置A-F的背景色
+  for (let col = 1; col <= 6; col++) {
+    worksheet.getCell(currentRow, col).fill = LIGHT_ORANGE;
+  }
   worksheet.getCell(`G${currentRow}`).value = Number(totalAmount.toFixed(2));
   worksheet.getCell(`G${currentRow}`).font = { ...DEFAULT_FONT, bold: true };
   worksheet.getCell(`G${currentRow}`).numFmt = `"${currencySymbol}"#,##0.00`;
@@ -414,6 +427,30 @@ export async function exportQuotationToExcel(options: ExportOptions): Promise<Bl
   for (let col = 1; col <= baseColCount; col++) {
     setBorder(worksheet.getCell(currentRow, col));
   }
+  
+  // 如果导出尺寸，添加CBM汇总
+  if (includeDimensions) {
+    // H-L合并，显示"CBM :"
+    worksheet.mergeCells(`H${currentRow}:L${currentRow}`);
+    worksheet.getCell(`H${currentRow}`).value = 'CBM :';
+    worksheet.getCell(`H${currentRow}`).font = { ...DEFAULT_FONT, bold: true };
+    worksheet.getCell(`H${currentRow}`).alignment = { horizontal: 'right', vertical: 'middle' };
+    worksheet.getCell(`H${currentRow}`).fill = LIGHT_BLUE;
+    for (let col = 8; col <= 12; col++) {
+      worksheet.getCell(currentRow, col).fill = LIGHT_BLUE;
+      setBorder(worksheet.getCell(currentRow, col));
+    }
+    
+    // M-O合并，显示CBM/m³总和（L列是第12列，但用户说L-O，应该是M-O，即第13-15列）
+    worksheet.mergeCells(`M${currentRow}:O${currentRow}`);
+    worksheet.getCell(`M${currentRow}`).value = totalCbmSum > 0 ? Number(totalCbmSum.toFixed(6)) : '';
+    worksheet.getCell(`M${currentRow}`).font = { ...DEFAULT_FONT, bold: true };
+    worksheet.getCell(`M${currentRow}`).alignment = { horizontal: 'center', vertical: 'middle' };
+    for (let col = 13; col <= 15; col++) {
+      setBorder(worksheet.getCell(currentRow, col));
+    }
+  }
+  
   worksheet.getRow(currentRow).height = 60;
   currentRow++;
   
